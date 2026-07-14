@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+te } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, TrendingUp, TrendingDown, Users, Star, BarChart3, Clock,
   Shield, AlertTriangle, Copy, ChevronDown, Search, Filter, ArrowUpRight
-} from "lucide-react";
+, Check} from "lucide-react";
 import { copyTraders } from "@/lib/data";
 import LiveChatBot from "@/components/LiveChatBot";
 
