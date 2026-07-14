@@ -9,21 +9,15 @@ import {
   BarChart3, Clock, Bell, Settings, ChevronRight, Eye, EyeOff
 } from "lucide-react";
 import { PLATFORMS } from "@/lib/countries";
+import { getUser, getBalance, getTrades, getTransactions, isLoggedIn } from "@/lib/backend";
+import { formatCurrency } from "@/lib/utils";
 import LiveChatBot from "@/components/LiveChatBot";
 
-const trades = [
-  { id: "t1", symbol: "EUR/USD", type: "buy" as const, volume: 0.5, profit: 170.00, openPrice: 1.1388, currentPrice: 1.1404 },
-  { id: "t2", symbol: "BTC/USD", type: "sell" as const, volume: 0.1, profit: 1255.00, openPrice: 64700.00, currentPrice: 63482.61 },
-  { id: "t3", symbol: "XAU/USD", type: "buy" as const, volume: 0.2, profit: -45.20, openPrice: 4089.50, currentPrice: 4074.46 },
-];
-
-const recentActivity = [
-  { id: "a1", type: "deposit", amount: 5000, desc: "Bank Transfer", time: "2 hours ago", status: "completed" },
-  { id: "a2", type: "trade", amount: 170, desc: "EUR/USD Buy 0.5 lots", time: "5 hours ago", status: "profit" },
-  { id: "a3", type: "withdrawal", amount: 1200, desc: "Crypto Wallet", time: "1 day ago", status: "pending" },
-];
-
 export default function DashboardPage() {
+  const [user, setUser] = useState(getUser());
+  const [balance, setBalance] = useState(getBalance());
+  const [trades, setTrades] = useState(getTrades());
+  const [transactions, setTransactions] = useState(getTransactions());
   const [activePlatform, setActivePlatform] = useState("mt5");
   const [hideBalance, setHideBalance] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -33,16 +27,40 @@ export default function DashboardPage() {
     { id: "n3", title: "Trade Executed", desc: "EUR/USD Buy 0.5 lots at 1.1388", time: "5h ago", read: true },
   ]);
 
+  useEffect(() => {
+    // Refresh data on mount
+    setUser(getUser());
+    setBalance(getBalance());
+    setTrades(getTrades());
+    setTransactions(getTransactions());
+  }, []);
+
+  // Calculate equity, margin, free margin from trades
+  const totalProfit = trades.reduce((sum, t) => sum + t.profit, 0);
+  const equity = balance + totalProfit;
+  const marginUsed = trades.reduce((sum, t) => sum + (t.openPrice * t.volume * 0.001), 0);
+  const freeMargin = equity - marginUsed;
+  const marginLevel = marginUsed > 0 ? (equity / marginUsed) * 100 : 0;
+
+  const recentActivity = transactions.slice(0, 3).map((t) => ({
+    id: t.id,
+    type: t.type,
+    amount: t.amount,
+    desc: `${t.type === "deposit" ? "Deposit" : "Withdrawal"} via ${t.method}`,
+    time: t.createdAt ? new Date(t.createdAt).toLocaleDateString() : "Recent",
+    status: t.status === "approved" ? "completed" : t.status,
+  }));
+
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <header className="sticky top-0 z-50 bg-white border-b border-[#D9D3CB] px-4 py-3">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-lg font-bold text-[#1A1A1A]">Dashboard</h1>
-            <p className="text-xs text-[#9B9590]">Account: 60332183 | Standard (EUR)</p>
+            <p className="text-xs text-[#9B9590]">Account: {user?.id?.slice(-8) || "60332183"} | {user?.accountType ? user.accountType.charAt(0).toUpperCase() + user.accountType.slice(1) : "Standard"} ({user?.currency || "EUR"})</p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="px-2 py-1 bg-[#22A958]/10 text-[#22A958] text-[10px] font-bold rounded-lg uppercase">Verified</span>
+            <span className="px-2 py-1 bg-[#22A958]/10 text-[#22A958] text-[10px] font-bold rounded-lg uppercase">{user?.status === "active" ? "Verified" : "Pending"}</span>
             <div className="relative">
               <button onClick={() => setShowNotifications(!showNotifications)} className="relative p-2 rounded-lg hover:bg-[#F5F2ED] transition-colors">
                 <Bell size={18} className="text-[#1A1A1A]" />
@@ -52,12 +70,7 @@ export default function DashboardPage() {
               </button>
               <AnimatePresence>
                 {showNotifications && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                    className="absolute right-0 mt-2 w-80 bg-white border border-[#D9D3CB] rounded-2xl shadow-2xl z-50 overflow-hidden"
-                  >
+                  <motion.div initial={{ opacity: 0, y: -10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -10, scale: 0.95 }} className="absolute right-0 mt-2 w-80 bg-white border border-[#D9D3CB] rounded-2xl shadow-2xl z-50 overflow-hidden">
                     <div className="px-4 py-3 border-b border-[#F5F2ED] flex items-center justify-between">
                       <h3 className="text-sm font-bold">Notifications</h3>
                       <span className="text-[10px] text-[#9B9590]">{notifications.filter((n) => !n.read).length} unread</span>
@@ -80,7 +93,7 @@ export default function DashboardPage() {
             </div>
             <Link href="/settings/">
               <div className="w-9 h-9 rounded-full bg-[#1A1A1A] flex items-center justify-center text-white text-xs font-black cursor-pointer hover:bg-[#D31C2B] transition-colors">
-                JD
+                {user?.name?.split(" ").map((n: string) => n[0]).join("") || "JD"}
               </div>
             </Link>
           </div>
@@ -91,17 +104,17 @@ export default function DashboardPage() {
         {/* Account Balance Cards */}
         <div className="grid grid-cols-2 gap-3">
           {[
-            { label: "Balance", value: "€12,500.00", icon: Wallet, color: "#1A1A1A" },
-            { label: "Equity", value: "€12,750.50", icon: TrendingUp, color: "#F5C842" },
-            { label: "Margin", value: "€2,500.00", icon: TrendingDown, color: "#D31C2B" },
-            { label: "Free Margin", value: "€10,250.50", icon: TrendingUp, color: "#22A958" },
+            { label: "Balance", value: formatCurrency(balance), icon: Wallet, color: "#1A1A1A" },
+            { label: "Equity", value: formatCurrency(equity), icon: TrendingUp, color: "#F5C842" },
+            { label: "Margin", value: formatCurrency(marginUsed), icon: TrendingDown, color: "#D31C2B" },
+            { label: "Free Margin", value: formatCurrency(freeMargin), icon: TrendingUp, color: "#22A958" },
           ].map((s) => (
             <div key={s.label} className="p-4 bg-[#F5F2ED] rounded-2xl">
               <div className="flex items-center justify-between mb-1">
                 <p className="text-[10px] text-[#9B9590] font-bold uppercase tracking-wider">{s.label}</p>
                 <s.icon size={14} style={{ color: s.color }} />
               </div>
-              <p className="text-lg font-black text-[#1A1A1A] font-mono-axi">{hideBalance ? "••••••" : s.value}</p>
+              <p className="text-lg font-black text-[#1A1A1A] font-mono-abi">{hideBalance ? "••••••" : s.value}</p>
             </div>
           ))}
         </div>
@@ -121,11 +134,7 @@ export default function DashboardPage() {
           <h2 className="text-xs font-bold text-[#9B9590] uppercase tracking-wider mb-4">Trading Platforms</h2>
           <div className="space-y-2">
             {PLATFORMS.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => setActivePlatform(p.id)}
-                className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all ${activePlatform === p.id ? "bg-white shadow-sm ring-1 ring-[#D31C2B]" : "hover:bg-white/50"}`}
-              >
+              <button key={p.id} onClick={() => setActivePlatform(p.id)} className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all ${activePlatform === p.id ? "bg-white shadow-sm ring-1 ring-[#D31C2B]" : "hover:bg-white/50"}`}>
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${activePlatform === p.id ? "bg-[#D31C2B]" : "bg-[#D9D3CB]"}`}>
                   <Monitor size={18} className="text-white" />
                 </div>
@@ -149,24 +158,31 @@ export default function DashboardPage() {
             <h2 className="text-xs font-bold text-[#9B9590] uppercase tracking-wider">Open Positions ({trades.length})</h2>
             <Link href="/trading/" className="text-[10px] text-[#D31C2B] font-bold">View All</Link>
           </div>
-          <div className="space-y-2">
-            {trades.map((t) => (
-              <div key={t.id} className="p-4 bg-[#F5F2ED] rounded-2xl">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${t.type === "buy" ? "bg-[#22A958]/10 text-[#22A958]" : "bg-[#D31C2B]/10 text-[#D31C2B]"}`}>{t.type}</span>
-                    <p className="text-sm font-bold text-[#1A1A1A]">{t.symbol}</p>
-                    <p className="text-[10px] text-[#9B9590]">{t.volume} lots</p>
+          {trades.length === 0 ? (
+            <div className="p-6 bg-[#F5F2ED] rounded-2xl text-center">
+              <p className="text-sm text-[#9B9590]">No open positions</p>
+              <Link href="/trading/"><motion.button whileTap={{ scale: 0.97 }} className="mt-3 px-4 py-2 bg-[#D31C2B] text-white text-xs font-bold rounded-lg">Start Trading</motion.button></Link>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {trades.slice(0, 3).map((t) => (
+                <div key={t.id} className="p-4 bg-[#F5F2ED] rounded-2xl">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${t.type === "buy" ? "bg-[#22A958]/10 text-[#22A958]" : "bg-[#D31C2B]/10 text-[#D31C2B]"}`}>{t.type}</span>
+                      <p className="text-sm font-bold text-[#1A1A1A]">{t.symbol}</p>
+                      <p className="text-[10px] text-[#9B9590]">{t.volume} lots</p>
+                    </div>
+                    <p className={`text-sm font-black font-mono-abi ${t.profit >= 0 ? "text-[#22A958]" : "text-[#D31C2B]"}`}>{t.profit >= 0 ? "+" : ""}€{t.profit.toFixed(2)}</p>
                   </div>
-                  <p className={`text-sm font-black font-mono-axi ${t.profit >= 0 ? "text-[#22A958]" : "text-[#D31C2B]"}`}>{t.profit >= 0 ? "+" : ""}€{t.profit.toFixed(2)}</p>
+                  <div className="flex items-center justify-between text-[10px] text-[#9B9590]">
+                    <span>Open: {t.openPrice}</span>
+                    <span>Current: {t.currentPrice}</span>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between text-[10px] text-[#9B9590]">
-                  <span>Open: {t.openPrice}</span>
-                  <span>Current: {t.currentPrice}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Recent Activity */}
@@ -175,27 +191,31 @@ export default function DashboardPage() {
             <h2 className="text-xs font-bold text-[#9B9590] uppercase tracking-wider">Recent Activity</h2>
             <Link href="/wallet/" className="text-[10px] text-[#D31C2B] font-bold">View All</Link>
           </div>
-          <div className="space-y-2">
-            {recentActivity.map((a) => (
-              <div key={a.id} className="flex items-center gap-3 p-3 bg-[#F5F2ED] rounded-xl">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${a.type === "deposit" ? "bg-[#22A958]/10" : a.type === "withdrawal" ? "bg-[#D31C2B]/10" : "bg-[#F5C842]/10"}`}>
-                  {a.type === "deposit" ? <ArrowUpRight size={14} className="text-[#22A958]" /> : a.type === "withdrawal" ? <ArrowDownRight size={14} className="text-[#D31C2B]" /> : <BarChart3 size={14} className="text-[#F5C842]" />}
+          {recentActivity.length === 0 ? (
+            <div className="p-4 bg-[#F5F2ED] rounded-2xl text-center">
+              <p className="text-sm text-[#9B9590]">No recent activity</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {recentActivity.map((a) => (
+                <div key={a.id} className="flex items-center gap-3 p-3 bg-[#F5F2ED] rounded-xl">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${a.type === "deposit" ? "bg-[#22A958]/10" : "bg-[#D31C2B]/10"}`}>
+                    {a.type === "deposit" ? <ArrowUpRight size={14} className="text-[#22A958]" /> : <ArrowDownRight size={14} className="text-[#D31C2B]" />}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-bold text-[#1A1A1A]">{a.desc}</p>
+                    <p className="text-[10px] text-[#9B9590]">{a.time}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-xs font-bold ${a.type === "deposit" ? "text-[#22A958]" : "text-[#D31C2B]"}`}>{a.type === "deposit" ? "+" : "-"}€{a.amount.toLocaleString()}</p>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${a.status === "completed" ? "bg-[#22A958]/10 text-[#22A958]" : a.status === "pending" ? "bg-[#F5C842]/10 text-[#F5C842]" : "bg-[#D31C2B]/10 text-[#D31C2B]"}`}>
+                      {a.status}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <p className="text-xs font-bold text-[#1A1A1A]">{a.desc}</p>
-                  <p className="text-[10px] text-[#9B9590]">{a.time}</p>
-                </div>
-                <div className="text-right">
-                  <p className={`text-xs font-bold ${a.type === "deposit" || (a.type === "trade" && a.status === "profit") ? "text-[#22A958]" : "text-[#D31C2B]"}`}>
-                    {a.type === "deposit" || (a.type === "trade" && a.status === "profit") ? "+" : "-"}€{a.amount.toLocaleString()}
-                  </p>
-                  <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${a.status === "completed" ? "bg-[#22A958]/10 text-[#22A958]" : a.status === "pending" ? "bg-[#F5C842]/10 text-[#F5C842]" : "bg-[#D31C2B]/10 text-[#D31C2B]"}`}>
-                    {a.status}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Quick Links */}

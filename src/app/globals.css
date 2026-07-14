@@ -6,22 +6,23 @@
 
 @layer base {
   :root {
-    --color-primary-red: #D31C2B;
-    --color-primary-red-dark: #B91623;
-    --color-cream: #EDE8E0;
-    --color-cream-light: #F5F2ED;
-    --color-beige: #E8E0D4;
-    --color-dark: #1A1A1A;
-    --color-dark-charcoal: #2D2D2D;
-    --color-text-primary: #1A1A1A;
-    --color-text-secondary: #6B6560;
-    --color-text-muted: #9B9590;
-    --color-accent-yellow: #F5C842;
-    --color-accent-yellow-hover: #E0B73A;
-    --color-success: #22A958;
-    --color-danger: #D31C2B;
-    --color-border: #D9D3CB;
-    --color-border-dark: rgba(255,255,255,0.15);
+    /* AXI Brand Colors */
+    --axi-red: #D31C2B;
+    --axi-red-dark: #B91623;
+    --axi-cream: #EDE8E0;
+    --axi-cream-light: #F5F2ED;
+    --axi-beige: #E8E0D4;
+    --axi-gold: #F5C842;
+    --axi-gold-hover: #E0B73A;
+    --axi-black: #1A1A1A;
+    --axi-charcoal: #2D2D2D;
+    --axi-text: #1A1A1A;
+    --axi-text-secondary: #6B6560;
+    --axi-text-muted: #9B9590;
+    --axi-success: #22A958;
+    --axi-danger: #D31C2B;
+    --axi-border: #D9D3CB;
+    --axi-white: #FFFFFF;
 
     --background: 0 0% 100%;
     --foreground: 0 0% 10%;
@@ -55,8 +56,8 @@
 
   body {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    color: var(--color-text-primary);
-    background-color: #ffffff;
+    color: var(--axi-text);
+    background-color: var(--axi-cream);
     line-height: 1.6;
     overflow-x: hidden;
   }
@@ -71,10 +72,10 @@
   }
 
   .btn-yellow {
-    background-color: var(--color-accent-yellow);
-    color: #000;
+    background-color: var(--axi-gold);
+    color: var(--axi-black);
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 1.5px;
     padding: 12px 28px;
@@ -86,13 +87,13 @@
     cursor: pointer;
     border: none;
   }
-  .btn-yellow:hover { background-color: var(--color-accent-yellow-hover); }
+  .btn-yellow:hover { background-color: var(--axi-gold-hover); }
 
   .btn-red {
-    background-color: var(--color-primary-red);
-    color: #fff;
+    background-color: var(--axi-red);
+    color: var(--axi-white);
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 1.5px;
     padding: 12px 28px;
@@ -104,7 +105,7 @@
     cursor: pointer;
     border: none;
   }
-  .btn-red:hover { background-color: var(--color-primary-red-dark); }
+  .btn-red:hover { background-color: var(--axi-red-dark); }
 
   .section-padding { padding-top: 64px; padding-bottom: 64px; }
 
