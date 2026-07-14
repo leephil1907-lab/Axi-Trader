@@ -2,8 +2,17 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  country?: string;
+  language?: string;
+  currency?: string;
+  accountType?: string;
+  platform?: string;
   role: "user" | "admin";
   status: "active" | "pending" | "suspended";
+  kycStatus?: "not_started" | "pending" | "verified" | "rejected";
   balance: number;
   equity: number;
   margin: number;
@@ -12,6 +21,7 @@ export interface User {
   totalProfit: number;
   totalLoss: number;
   createdAt: Date;
+  lastLogin?: string;
 }
 
 export interface Trader {
@@ -89,4 +99,16 @@ export interface ChatMessage {
   sender: "user" | "bot";
   text: string;
   timestamp: Date;
+}
+
+export interface KycDocument {
+  id: string;
+  userId: string;
+  type: "id_passport" | "proof_address" | "selfie" | "bank_statement";
+  status: "pending" | "approved" | "rejected";
+  fileUrl: string;
+  fileName: string;
+  reviewedAt?: Date;
+  reviewedBy?: string;
+  rejectionReason?: string;
 }

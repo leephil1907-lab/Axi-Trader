@@ -1,6 +1,6 @@
 "use client";
 
-import { User, Transaction, OpenTrade } from "@/types";
+import { User, Transaction, OpenTrade, KycDocument } from "@/types";
 
 const STORAGE_KEYS = {
   USER: "axi_user",
@@ -10,7 +10,24 @@ const STORAGE_KEYS = {
   SESSION: "axi_session",
   WATCHLIST: "axi_watchlist",
   SETTINGS: "axi_settings",
+  KYC_DOCS: "axi_kyc_docs",
+  USERS: "axi_users", // For admin: all users list
 };
+
+// Admin credentials (hardcoded for demo - in production use database)
+const ADMIN_EMAIL = "admin@axi.com";
+const ADMIN_PASSWORD = "admin123";
+
+// Check if current user is admin
+export function isAdmin(): boolean {
+  const user = getUser();
+  return user?.role === "admin" || user?.email === ADMIN_EMAIL;
+}
+
+// Check if email is admin email
+export function isAdminEmail(email: string): boolean {
+  return email === ADMIN_EMAIL;
+}
 
 // User Management
 export function getUser(): User | null {
@@ -33,11 +50,81 @@ export function isLoggedIn(): boolean {
   return !!getUser();
 }
 
+// Admin: Get all users
+export function getAllUsers(): User[] {
+  if (typeof window === "undefined") return [];
+  if (!isAdmin()) return [];
+  const data = localStorage.getItem(STORAGE_KEYS.USERS);
+  return data ? JSON.parse(data) : [];
+}
+
+export function addUserToSystem(user: User): void {
+  if (typeof window === "undefined") return;
+  const users = getAllUsers();
+  users.push(user);
+  localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+}
+
+// Admin: Get all transactions across all users
+export function getAllTransactions(): Transaction[] {
+  if (typeof window === "undefined") return [];
+  if (!isAdmin()) return [];
+  const data = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
+  return data ? JSON.parse(data) : [];
+}
+
+// Admin: Get all KYC documents
+export function getAllKycDocuments(): KycDocument[] {
+  if (typeof window === "undefined") return [];
+  if (!isAdmin()) return [];
+  const data = localStorage.getItem(STORAGE_KEYS.KYC_DOCS);
+  return data ? JSON.parse(data) : [];
+}
+
+// Admin: Approve/Reject KYC
+export function updateKycStatus(docId: string, status: "approved" | "rejected", reason?: string): void {
+  if (!isAdmin()) return;
+  const docs = getAllKycDocuments();
+  const doc = docs.find((d) => d.id === docId);
+  if (doc) {
+    doc.status = status;
+    doc.reviewedAt = new Date();
+    doc.reviewedBy = getUser()?.name || "Admin";
+    doc.rejectionReason = reason;
+    localStorage.setItem(STORAGE_KEYS.KYC_DOCS, JSON.stringify(docs));
+  }
+}
+
+// Admin: Approve/Reject transaction
+export function adminUpdateTransactionStatus(id: string, status: "approved" | "rejected", reason?: string): void {
+  if (!isAdmin()) return;
+  const transactions = getAllTransactions();
+  const tx = transactions.find((t) => t.id === id);
+  if (tx) {
+    tx.status = status;
+    tx.reviewedAt = new Date();
+    tx.reviewedBy = getUser()?.name || "Admin";
+    tx.rejectionReason = reason;
+    localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(transactions));
+  }
+}
+
+// Admin: Update user status
+export function adminUpdateUserStatus(userId: string, status: "active" | "suspended" | "banned"): void {
+  if (!isAdmin()) return;
+  const users = getAllUsers();
+  const user = users.find((u) => u.id === userId);
+  if (user) {
+    user.status = status;
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+  }
+}
+
 // Balance Management
 export function getBalance(): number {
   if (typeof window === "undefined") return 0;
   const data = localStorage.getItem(STORAGE_KEYS.BALANCE);
-  return data ? parseFloat(data) : 12500.00; // Default starting balance
+  return data ? parseFloat(data) : 12500.00;
 }
 
 export function setBalance(amount: number): void {
@@ -62,7 +149,6 @@ export function addTransaction(transaction: Transaction): void {
   transactions.unshift(transaction);
   localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(transactions));
 
-  // Update balance
   if (transaction.status === "approved") {
     if (transaction.type === "deposit") {
       updateBalance(transaction.amount);
@@ -112,11 +198,9 @@ export function closeTrade(id: string, closePrice: number): number {
     trade.currentPrice = closePrice;
     trade.profit = profit;
 
-    // Remove from open trades
     const updatedTrades = trades.filter((t) => t.id !== id);
     localStorage.setItem(STORAGE_KEYS.TRADES, JSON.stringify(updatedTrades));
 
-    // Update balance with profit/loss
     updateBalance(profit);
 
     return profit;

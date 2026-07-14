@@ -5,7 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Mail, Lock, Eye, EyeOff, Globe, ChevronDown, Award, ArrowRight, Shield, Zap } from "lucide-react";
 import { LANGUAGES } from "@/lib/countries";
-import { getUser, setUser } from "@/lib/backend";
+import { setUser, setBalance, isAdminEmail, addUserToSystem } from "@/lib/backend";
 import LiveChatBot from "@/components/LiveChatBot";
 
 export default function LoginPage() {
@@ -28,25 +28,56 @@ export default function LoginPage() {
     }
     setIsLoading(true);
     setTimeout(() => {
-      const existingUser = getUser();
-      if (existingUser && existingUser.email === email) {
-        setUser({ ...existingUser, lastLogin: new Date().toISOString() });
+      const isAdmin = isAdminEmail(email) && password === "admin123";
+
+      if (isAdmin) {
+        // Admin login
+        const adminUser = {
+          id: "admin-1",
+          email: "admin@axi.com",
+          name: "Admin User",
+          firstName: "Admin",
+          lastName: "User",
+          role: "admin" as const,
+          status: "active" as const,
+          balance: 999999,
+          equity: 999999,
+          margin: 0,
+          freeMargin: 999999,
+          marginLevel: 100,
+          totalProfit: 0,
+          totalLoss: 0,
+          createdAt: new Date(),
+          kycStatus: "verified" as const,
+        };
+        setUser(adminUser);
+        setBalance(999999);
+        addUserToSystem(adminUser);
         setIsLoading(false);
         window.location.href = "/dashboard/";
-      } else if (email === "admin@axi.com" && password === "admin123") {
-        setUser({
-          id: "admin-1", email: "admin@axi.com", name: "Admin User", role: "admin", status: "active",
-          balance: 999999, equity: 999999, margin: 0, freeMargin: 999999, marginLevel: 100,
-          totalProfit: 0, totalLoss: 0, createdAt: new Date(),
-        });
-        setIsLoading(false);
-        window.location.href = "/admin/";
       } else {
-        setUser({
-          id: "user-" + Date.now(), email: email, name: email.split("@")[0], role: "user", status: "active",
-          balance: 12500, equity: 12750, margin: 2500, freeMargin: 10250, marginLevel: 510,
-          totalProfit: 250, totalLoss: 0, createdAt: new Date(),
-        });
+        // Regular user login
+        const user = {
+          id: "user-" + Date.now(),
+          email: email,
+          name: email.split("@")[0],
+          firstName: email.split("@")[0],
+          lastName: "",
+          role: "user" as const,
+          status: "active" as const,
+          balance: 12500,
+          equity: 12750,
+          margin: 2500,
+          freeMargin: 10250,
+          marginLevel: 510,
+          totalProfit: 250,
+          totalLoss: 0,
+          createdAt: new Date(),
+          kycStatus: "not_started" as const,
+        };
+        setUser(user);
+        setBalance(12500);
+        addUserToSystem(user);
         setIsLoading(false);
         window.location.href = "/dashboard/";
       }
@@ -55,14 +86,11 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-axi-cream flex flex-col">
-      {/* Top Bar - White with red accent */}
       <div className="px-4 py-3 flex items-center justify-between bg-white border-b border-axi-border">
-        <div className="flex items-center gap-2">
-          <svg viewBox="0 0 200 60" className="w-16 h-auto">
-            <text x="5" y="45" fontFamily="Arial, sans-serif" fontSize="40" fontWeight="900" fill="#D31C2B" letterSpacing="-2">axi</text>
-            <polygon points="100,8 113,8 107,22" fill="#D31C2B" />
-          </svg>
-        </div>
+        <svg viewBox="0 0 200 60" className="w-16 h-auto">
+          <text x="5" y="45" fontFamily="Arial, sans-serif" fontSize="40" fontWeight="900" fill="#D31C2B" letterSpacing="-2">axi</text>
+          <polygon points="100,8 113,8 107,22" fill="#D31C2B" />
+        </svg>
         <div className="relative">
           <button onClick={() => setShowLang(!showLang)} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-axi-cream text-axi-text-muted text-xs hover:bg-axi-beige transition-colors">
             <Globe size={14} /><span>{selectedLang?.label}</span>
