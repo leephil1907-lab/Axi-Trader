@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=file:./dev.db
+      - JWT_SECRET=axi-trader-docker-secret-key-min-32-chars-long
+      - JWT_EXPIRES_IN=7d
+      - NEXT_PUBLIC_APP_URL=http://localhost:3000
+    volumes:
+      - ./dev.db:/app/dev.db
+    restart: unless-stopped

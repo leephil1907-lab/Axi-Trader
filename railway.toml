@@ -1,0 +1,13 @@
+[build]
+cmd = "npm install && npx prisma generate && npx prisma db push && npm run build"
+
+[deploy]
+startCommand = "npm start"
+healthcheckPath = "/api/auth/me/"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+[deploy.env]
+NODE_ENV = "production"
+PORT = "3000"
