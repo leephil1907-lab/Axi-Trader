@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       data: { lastLogin: new Date() },
     });
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       token,
       user: {
         id: user.id, email: user.email, name: user.name,
@@ -38,6 +38,17 @@ export async function POST(req: NextRequest) {
         accountType: user.accountType, platform: user.platform, kycStatus: user.kycStatus,
       }
     });
+
+    // Set HTTP-only cookie for middleware auth
+    response.cookies.set("axi_token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: "/",
+    });
+
+    return response;
   } catch (err: any) {
     console.error("Login error:", err);
     return NextResponse.json({ error: "Login failed", detail: err.message }, { status: 500 });
