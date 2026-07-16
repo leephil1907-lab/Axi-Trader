@@ -3,206 +3,82 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  password      String
-  firstName     String
-  lastName      String
-  phone         String?
-  country       String
-  language      String   @default("en")
-  currency      String   @default("EUR")
-  accountType   String   @default("standard")
-  platform      String   @default("mt5")
-  role          Role     @default(USER)
-  status        Status   @default(PENDING)
-  kycStatus     KycStatus @default(NOT_STARTED)
+  id          String   @id @default(cuid())
+  email       String   @unique
+  password    String?
+  name        String
+  firstName   String?
+  lastName    String?
+  phone       String?
+  country     String?
+  language    String   @default("en")
+  currency    String   @default("USD")
+  accountType String   @default("standard")
+  platform    String   @default("mt5")
+  role        String   @default("user")
+  status      String   @default("active")
+  kycStatus   String   @default("not_started")
+  balance     Float    @default(0)
+  equity      Float    @default(0)
+  margin      Float    @default(0)
+  freeMargin  Float    @default(0)
+  marginLevel Float    @default(0)
+  totalProfit Float    @default(0)
+  totalLoss   Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  lastLogin   DateTime?
 
-  // Trading account
-  balance       Decimal  @default(0) @db.Decimal(18, 2)
-  equity        Decimal  @default(0) @db.Decimal(18, 2)
-  margin        Decimal  @default(0) @db.Decimal(18, 2)
-  freeMargin    Decimal  @default(0) @db.Decimal(18, 2)
-  marginLevel   Decimal  @default(0) @db.Decimal(18, 2)
-
-  // Relations
-  transactions  Transaction[]
-  trades        Trade[]
-  kycDocuments  KycDocument[]
-
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  lastLogin     DateTime?
+  transactions Transaction[]
+  trades       Trade[]
+  kycDocs      KycDocument[]
 }
 
 model Transaction {
-  id            String   @id @default(cuid())
-  userId        String
-  user          User     @relation(fields: [userId], references: [id])
-
-  type          TxType
-  amount        Decimal  @db.Decimal(18, 2)
-  currency      String   @default("EUR")
-  method        String   // bank_transfer, crypto, card, skrill
-  status        TxStatus @default(PENDING)
-
-  // For crypto withdrawals
-  walletAddress String?
-  txHash        String?
-
-  // For bank transfers
-  bankName      String?
-  accountName   String?
-  accountNumber String?
-  swiftCode     String?
-
-  // For cards
-  cardLast4     String?
-
-  reviewedAt    DateTime?
-  reviewedBy    String?
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  type            String
+  amount          Float
+  currency        String
+  method          String
+  status          String   @default("pending")
+  createdAt       DateTime @default(now())
+  reviewedAt      DateTime?
+  reviewedBy      String?
   rejectionReason String?
-
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
 }
 
 model Trade {
-  id            String   @id @default(cuid())
-  userId        String
-  user          User     @relation(fields: [userId], references: [id])
-
-  symbol        String
-  type          TradeType
-  volume        Decimal  @db.Decimal(18, 4)
-  openPrice     Decimal  @db.Decimal(18, 6)
-  closePrice    Decimal? @db.Decimal(18, 6)
-  currentPrice  Decimal  @db.Decimal(18, 6)
-
-  stopLoss      Decimal? @db.Decimal(18, 6)
-  takeProfit    Decimal? @db.Decimal(18, 6)
-
-  profit        Decimal  @default(0) @db.Decimal(18, 2)
-  commission    Decimal  @default(0) @db.Decimal(18, 2)
-  swap          Decimal  @default(0) @db.Decimal(18, 2)
-
-  status        TradeStatus @default(OPEN)
-
-  openedAt      DateTime @default(now())
-  closedAt      DateTime?
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  symbol       String
+  type         String
+  volume       Float
+  openPrice    Float
+  currentPrice Float
+  profit       Float
+  stopLoss     Float?
+  takeProfit   Float?
+  openedAt     DateTime @default(now())
+  closedAt     DateTime?
 }
 
 model KycDocument {
-  id            String   @id @default(cuid())
-  userId        String
-  user          User     @relation(fields: [userId], references: [id])
-
-  type          DocType
-  status        DocStatus @default(PENDING)
-  fileUrl       String
-  fileName      String
-
-  reviewedAt    DateTime?
-  reviewedBy    String?
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  type            String
+  status          String   @default("pending")
+  fileUrl         String
+  fileName        String
+  reviewedAt      DateTime?
+  reviewedBy      String?
   rejectionReason String?
-
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-}
-
-model MarketPrice {
-  id            String   @id @default(cuid())
-  symbol        String   @unique
-  name          String
-  price         Decimal  @db.Decimal(18, 6)
-  bid           Decimal  @db.Decimal(18, 6)
-  ask           Decimal  @db.Decimal(18, 6)
-  spread        Decimal  @db.Decimal(18, 6)
-  change        Decimal  @db.Decimal(18, 6)
-  changePercent Decimal  @db.Decimal(18, 4)
-  high          Decimal  @db.Decimal(18, 6)
-  low           Decimal  @db.Decimal(18, 6)
-  volume        String
-  category      String
-  leverage      String?
-  updatedAt     DateTime @updatedAt
-}
-
-model CopyTrader {
-  id            String   @id @default(cuid())
-  name          String
-  avatar        String
-  strategy      String
-  riskScore     Decimal  @db.Decimal(3, 1)
-  followers     Int      @default(0)
-  totalReturn   Decimal  @db.Decimal(18, 2)
-  monthlyReturn Decimal  @db.Decimal(18, 2)
-  winRate       Decimal  @db.Decimal(5, 2)
-  tradesCount   Int      @default(0)
-  avgDuration   String
-  profitFactor  Decimal  @db.Decimal(5, 2)
-  isPro         Boolean  @default(false)
-
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-}
-
-enum Role {
-  USER
-  ADMIN
-}
-
-enum Status {
-  ACTIVE
-  PENDING
-  SUSPENDED
-  BANNED
-}
-
-enum KycStatus {
-  NOT_STARTED
-  PENDING
-  VERIFIED
-  REJECTED
-}
-
-enum TxType {
-  DEPOSIT
-  WITHDRAWAL
-}
-
-enum TxStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  PROCESSING
-}
-
-enum TradeType {
-  BUY
-  SELL
-}
-
-enum TradeStatus {
-  OPEN
-  CLOSED
-  CANCELLED
-}
-
-enum DocType {
-  ID_PASSPORT
-  PROOF_ADDRESS
-  SELFIE
-  BANK_STATEMENT
-}
-
-enum DocStatus {
-  PENDING
-  APPROVED
-  REJECTED
 }

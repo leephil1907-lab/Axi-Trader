@@ -11,25 +11,10 @@ const STORAGE_KEYS = {
   WATCHLIST: "axi_watchlist",
   SETTINGS: "axi_settings",
   KYC_DOCS: "axi_kyc_docs",
-  USERS: "axi_users", // For admin: all users list
+  USERS: "axi_users",
 };
 
-// Admin credentials (hardcoded for demo - in production use database)
-const ADMIN_EMAIL = "admin@axi.com";
-const ADMIN_PASSWORD = "admin123";
-
-// Check if current user is admin
-export function isAdmin(): boolean {
-  const user = getUser();
-  return user?.role === "admin" || user?.email === ADMIN_EMAIL;
-}
-
-// Check if email is admin email
-export function isAdminEmail(email: string): boolean {
-  return email === ADMIN_EMAIL;
-}
-
-// User Management
+// User Management (client-side)
 export function getUser(): User | null {
   if (typeof window === "undefined") return null;
   const data = localStorage.getItem(STORAGE_KEYS.USER);
@@ -50,81 +35,11 @@ export function isLoggedIn(): boolean {
   return !!getUser();
 }
 
-// Admin: Get all users
-export function getAllUsers(): User[] {
-  if (typeof window === "undefined") return [];
-  if (!isAdmin()) return [];
-  const data = localStorage.getItem(STORAGE_KEYS.USERS);
-  return data ? JSON.parse(data) : [];
-}
-
-export function addUserToSystem(user: User): void {
-  if (typeof window === "undefined") return;
-  const users = getAllUsers();
-  users.push(user);
-  localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-}
-
-// Admin: Get all transactions across all users
-export function getAllTransactions(): Transaction[] {
-  if (typeof window === "undefined") return [];
-  if (!isAdmin()) return [];
-  const data = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
-  return data ? JSON.parse(data) : [];
-}
-
-// Admin: Get all KYC documents
-export function getAllKycDocuments(): KycDocument[] {
-  if (typeof window === "undefined") return [];
-  if (!isAdmin()) return [];
-  const data = localStorage.getItem(STORAGE_KEYS.KYC_DOCS);
-  return data ? JSON.parse(data) : [];
-}
-
-// Admin: Approve/Reject KYC
-export function updateKycStatus(docId: string, status: "approved" | "rejected", reason?: string): void {
-  if (!isAdmin()) return;
-  const docs = getAllKycDocuments();
-  const doc = docs.find((d) => d.id === docId);
-  if (doc) {
-    doc.status = status;
-    doc.reviewedAt = new Date();
-    doc.reviewedBy = getUser()?.name || "Admin";
-    doc.rejectionReason = reason;
-    localStorage.setItem(STORAGE_KEYS.KYC_DOCS, JSON.stringify(docs));
-  }
-}
-
-// Admin: Approve/Reject transaction
-export function adminUpdateTransactionStatus(id: string, status: "approved" | "rejected", reason?: string): void {
-  if (!isAdmin()) return;
-  const transactions = getAllTransactions();
-  const tx = transactions.find((t) => t.id === id);
-  if (tx) {
-    tx.status = status;
-    tx.reviewedAt = new Date();
-    tx.reviewedBy = getUser()?.name || "Admin";
-    tx.rejectionReason = reason;
-    localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(transactions));
-  }
-}
-
-// Admin: Update user status
-export function adminUpdateUserStatus(userId: string, status: "active" | "suspended" | "banned"): void {
-  if (!isAdmin()) return;
-  const users = getAllUsers();
-  const user = users.find((u) => u.id === userId);
-  if (user) {
-    user.status = status;
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-  }
-}
-
-// Balance Management
+// Balance
 export function getBalance(): number {
   if (typeof window === "undefined") return 0;
   const data = localStorage.getItem(STORAGE_KEYS.BALANCE);
-  return data ? parseFloat(data) : 12500.00;
+  return data ? parseFloat(data) : 0;
 }
 
 export function setBalance(amount: number): void {
@@ -132,100 +47,56 @@ export function setBalance(amount: number): void {
   localStorage.setItem(STORAGE_KEYS.BALANCE, amount.toString());
 }
 
-export function updateBalance(amount: number): void {
-  const current = getBalance();
-  setBalance(current + amount);
-}
-
-// Transaction Management
-export function getTransactions(): Transaction[] {
-  if (typeof window === "undefined") return [];
-  const data = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
-  return data ? JSON.parse(data) : [];
-}
-
-export function addTransaction(transaction: Transaction): void {
-  const transactions = getTransactions();
-  transactions.unshift(transaction);
-  localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(transactions));
-
-  if (transaction.status === "approved") {
-    if (transaction.type === "deposit") {
-      updateBalance(transaction.amount);
-    } else if (transaction.type === "withdrawal") {
-      updateBalance(-transaction.amount);
-    }
-  }
-}
-
-export function updateTransactionStatus(id: string, status: "pending" | "approved" | "rejected"): void {
-  const transactions = getTransactions();
-  const tx = transactions.find((t) => t.id === id);
-  if (tx) {
-    tx.status = status;
-    if (status === "approved") {
-      if (tx.type === "deposit") {
-        updateBalance(tx.amount);
-      } else if (tx.type === "withdrawal") {
-        updateBalance(-tx.amount);
-      }
-    }
-    localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(transactions));
-  }
-}
-
-// Trade Management
+// Trades
 export function getTrades(): OpenTrade[] {
   if (typeof window === "undefined") return [];
   const data = localStorage.getItem(STORAGE_KEYS.TRADES);
   return data ? JSON.parse(data) : [];
 }
 
-export function addTrade(trade: OpenTrade): void {
-  const trades = getTrades();
-  trades.unshift(trade);
+export function setTrades(trades: OpenTrade[]): void {
+  if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEYS.TRADES, JSON.stringify(trades));
 }
 
-export function closeTrade(id: string, closePrice: number): number {
-  const trades = getTrades();
-  const trade = trades.find((t) => t.id === id);
-  if (trade) {
-    const profit = trade.type === "buy" 
-      ? (closePrice - trade.openPrice) * trade.volume * 100000
-      : (trade.openPrice - closePrice) * trade.volume * 100000;
-
-    trade.currentPrice = closePrice;
-    trade.profit = profit;
-
-    const updatedTrades = trades.filter((t) => t.id !== id);
-    localStorage.setItem(STORAGE_KEYS.TRADES, JSON.stringify(updatedTrades));
-
-    updateBalance(profit);
-
-    return profit;
-  }
-  return 0;
+// Transactions
+export function getTransactions(): Transaction[] {
+  if (typeof window === "undefined") return [];
+  const data = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
+  return data ? JSON.parse(data) : [];
 }
 
-export function updateTradePrices(currentPrices: Record<string, number>): void {
-  const trades = getTrades();
-  trades.forEach((trade) => {
-    if (currentPrices[trade.symbol]) {
-      trade.currentPrice = currentPrices[trade.symbol];
-      trade.profit = trade.type === "buy"
-        ? (trade.currentPrice - trade.openPrice) * trade.volume * 100000
-        : (trade.openPrice - trade.currentPrice) * trade.volume * 100000;
-    }
-  });
-  localStorage.setItem(STORAGE_KEYS.TRADES, JSON.stringify(trades));
+export function addTransaction(tx: Transaction): void {
+  if (typeof window === "undefined") return;
+  const txs = getTransactions();
+  txs.push(tx);
+  localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(txs));
+}
+
+export function setTransactions(txs: Transaction[]): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(txs));
+}
+
+// KYC Docs
+export function getKycDocuments(): KycDocument[] {
+  if (typeof window === "undefined") return [];
+  const data = localStorage.getItem(STORAGE_KEYS.KYC_DOCS);
+  return data ? JSON.parse(data) : [];
+}
+
+export function addKycDocument(doc: KycDocument): void {
+  if (typeof window === "undefined") return;
+  const docs = getKycDocuments();
+  docs.push(doc);
+  localStorage.setItem(STORAGE_KEYS.KYC_DOCS, JSON.stringify(docs));
 }
 
 // Watchlist
 export function getWatchlist(): string[] {
-  if (typeof window === "undefined") return ["EUR/USD", "BTC/USD", "XAU/USD"];
+  if (typeof window === "undefined") return [];
   const data = localStorage.getItem(STORAGE_KEYS.WATCHLIST);
-  return data ? JSON.parse(data) : ["EUR/USD", "BTC/USD", "XAU/USD"];
+  return data ? JSON.parse(data) : [];
 }
 
 export function setWatchlist(symbols: string[]): void {
@@ -233,27 +104,11 @@ export function setWatchlist(symbols: string[]): void {
   localStorage.setItem(STORAGE_KEYS.WATCHLIST, JSON.stringify(symbols));
 }
 
-export function toggleWatchlistSymbol(symbol: string): string[] {
-  const current = getWatchlist();
-  const updated = current.includes(symbol) 
-    ? current.filter((s) => s !== symbol)
-    : [...current, symbol];
-  setWatchlist(updated);
-  return updated;
-}
-
 // Settings
 export function getSettings(): Record<string, any> {
   if (typeof window === "undefined") return {};
   const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-  return data ? JSON.parse(data) : {
-    language: "en",
-    currency: "EUR",
-    darkMode: false,
-    notifications: { trade: true, price: true, deposit: true, marketing: false },
-    twoFA: false,
-    biometric: false,
-  };
+  return data ? JSON.parse(data) : {};
 }
 
 export function setSettings(settings: Record<string, any>): void {
@@ -261,13 +116,48 @@ export function setSettings(settings: Record<string, any>): void {
   localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
 }
 
-// Generate unique IDs
-export function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+// Format money
+export function formatMoney(amount: number, currency = "USD"): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+  }).format(amount);
 }
 
-// Format currency
-export function formatMoney(amount: number, currency: string = "EUR"): string {
-  const symbols: Record<string, string> = { EUR: "€", USD: "$", GBP: "£" };
-  return `${symbols[currency] || "€"}${amount.toFixed(2)}`;
+// Seed demo data
+export function seedDemoData(): void {
+  if (typeof window === "undefined") return;
+  if (localStorage.getItem(STORAGE_KEYS.USER)) return; // Already seeded
+
+  const demoUser: User = {
+    id: "demo-user-001",
+    email: "demo@axi.com",
+    name: "Demo Trader",
+    firstName: "Demo",
+    lastName: "Trader",
+    phone: "+1234567890",
+    country: "US",
+    language: "en",
+    currency: "USD",
+    accountType: "standard",
+    platform: "mt5",
+    role: "user",
+    status: "active",
+    kycStatus: "verified",
+    balance: 10000,
+    equity: 10250,
+    margin: 500,
+    freeMargin: 9750,
+    marginLevel: 2050,
+    totalProfit: 1250,
+    totalLoss: 0,
+    createdAt: new Date(),
+    lastLogin: new Date().toISOString(),
+  };
+
+  localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(demoUser));
+  localStorage.setItem(STORAGE_KEYS.BALANCE, "10000");
+  localStorage.setItem(STORAGE_KEYS.TRADES, JSON.stringify([]));
+  localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify([]));
+  localStorage.setItem(STORAGE_KEYS.WATCHLIST, JSON.stringify(["EURUSD", "GBPUSD", "XAUUSD", "BTCUSD"]));
 }

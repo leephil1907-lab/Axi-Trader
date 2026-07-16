@@ -1,28 +1,65 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground; }
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+/* === Backup Styles === */
+
 
 @layer base {
   :root {
-    /* AXI Brand Colors */
-    --axi-red: #D31C2B;
-    --axi-red-dark: #B91623;
-    --axi-cream: #EDE8E0;
-    --axi-cream-light: #F5F2ED;
-    --axi-beige: #E8E0D4;
-    --axi-gold: #F5C842;
-    --axi-gold-hover: #E0B73A;
-    --axi-black: #1A1A1A;
-    --axi-charcoal: #2D2D2D;
-    --axi-text: #1A1A1A;
-    --axi-text-secondary: #6B6560;
-    --axi-text-muted: #9B9590;
-    --axi-success: #22A958;
-    --axi-danger: #D31C2B;
-    --axi-border: #D9D3CB;
-    --axi-white: #FFFFFF;
+    --color-primary-red: #D31C2B;
+    --color-primary-red-dark: #B91623;
+    --color-cream: #EDE8E0;
+    --color-cream-light: #F5F2ED;
+    --color-beige: #E8E0D4;
+    --color-dark: #1A1A1A;
+    --color-dark-charcoal: #2D2D2D;
+    --color-text-primary: #1A1A1A;
+    --color-text-secondary: #6B6560;
+    --color-text-muted: #9B9590;
+    --color-accent-yellow: #F5C842;
+    --color-accent-yellow-hover: #E0B73A;
+    --color-success: #22A958;
+    --color-danger: #D31C2B;
+    --color-border: #D9D3CB;
+    --color-border-dark: rgba(255,255,255,0.15);
 
     --background: 0 0% 100%;
     --foreground: 0 0% 10%;
@@ -46,7 +83,9 @@
     --radius: 0.5rem;
   }
 
-  * { @apply border-border; }
+  * {
+    @apply border-border;
+  }
 
   html {
     scroll-behavior: smooth;
@@ -56,8 +95,8 @@
 
   body {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    color: var(--axi-text);
-    background-color: var(--axi-cream);
+    color: var(--color-text-primary);
+    background-color: var(--color-cream);
     line-height: 1.6;
     overflow-x: hidden;
   }
@@ -71,44 +110,6 @@
     padding-right: 24px;
   }
 
-  .btn-yellow {
-    background-color: var(--axi-gold);
-    color: var(--axi-black);
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    padding: 12px 28px;
-    border-radius: 4px;
-    transition: all 0.15s ease;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    border: none;
-  }
-  .btn-yellow:hover { background-color: var(--axi-gold-hover); }
-
-  .btn-red {
-    background-color: var(--axi-red);
-    color: var(--axi-white);
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    padding: 12px 28px;
-    border-radius: 4px;
-    transition: all 0.15s ease;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    border: none;
-  }
-  .btn-red:hover { background-color: var(--axi-red-dark); }
-
-  .section-padding { padding-top: 64px; padding-bottom: 64px; }
-
   .label-uppercase {
     font-size: 11px;
     font-weight: 600;
@@ -116,13 +117,89 @@
     letter-spacing: 1.5px;
   }
 
-  .font-mono-axi { font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace; }
+  .btn-yellow {
+    background-color: var(--color-accent-yellow);
+    color: #000;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    padding: 12px 28px;
+    border-radius: 4px;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: none;
+  }
+
+  .btn-yellow:hover {
+    background-color: var(--color-accent-yellow-hover);
+  }
+
+  .btn-yellow-pill {
+    background-color: transparent;
+    color: var(--color-accent-yellow);
+    border: 2px solid var(--color-accent-yellow);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    padding: 10px 28px;
+    border-radius: 9999px;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  .btn-yellow-pill:hover {
+    background-color: var(--color-accent-yellow);
+    color: #000;
+  }
+
+  .btn-yellow-pill-filled {
+    background-color: var(--color-accent-yellow);
+    color: #000;
+    border: 2px solid var(--color-accent-yellow);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    padding: 10px 28px;
+    border-radius: 9999px;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  .btn-yellow-pill-filled:hover {
+    background-color: var(--color-accent-yellow-hover);
+    border-color: var(--color-accent-yellow-hover);
+  }
+
+  .section-padding {
+    padding-top: 64px;
+    padding-bottom: 64px;
+  }
+
+  .section-padding-lg {
+    padding-top: 80px;
+    padding-bottom: 80px;
+  }
 }
 
 @layer utilities {
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
+  .text-balance {
+    text-wrap: balance;
   }
-  .scrollbar-hide::-webkit-scrollbar { display: none; }
+
+  .font-mono-axi {
+    font-family: 'Inter', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+  }
 }

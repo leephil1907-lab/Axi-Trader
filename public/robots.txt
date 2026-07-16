@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/
+Disallow: /portal/
+Disallow: /dashboard
+Disallow: /trading
+Disallow: /settings
+
+Sitemap: https://axi-trading.com/sitemap.xml
+Sitemap: https://axi-trading.com/sitemap-markets.xml
+Sitemap: https://axi-trading.com/sitemap-blog.xml
+
+Crawl-delay: 1

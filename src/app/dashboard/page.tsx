@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Wallet, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
@@ -10,405 +11,424 @@ import {
   Users, Check, X, Search, Filter, FileText, AlertTriangle
 } from "lucide-react";
 import { PLATFORMS } from "@/lib/countries";
-import { getUser, getBalance, getTrades, getTransactions, isAdmin, getAllUsers, getAllTransactions, adminUpdateTransactionStatus, adminUpdateUserStatus, formatMoney } from "@/lib/backend";
+import {
+  getUser, setUser, getBalance, setBalance, getTrades, setTrades,
+  getTransactions, setTransactions, formatMoney, seedDemoData
+} from "@/lib/backend";
+import { getAuthToken, removeAuthToken, clearClientAuth } from "@/lib/client-auth";
 import LiveChatBot from "@/components/LiveChatBot";
 
 export default function DashboardPage() {
-  const [user, setUser] = useState(getUser());
-  const [balance, setBalance] = useState(getBalance());
-  const [trades, setTrades] = useState(getTrades());
-  const [transactions, setTransactions] = useState(getTransactions());
+  const router = useRouter();
+  const [user, setUserState] = useState<any>(null);
+  const [balance, setBalanceState] = useState(0);
+  const [trades, setTradesState] = useState<any[]>([]);
+  const [transactions, setTransactionsState] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activePlatform, setActivePlatform] = useState("mt5");
   const [hideBalance, setHideBalance] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [adminTab, setAdminTab] = useState<"overview" | "users" | "transactions" | "kyc">("overview");
-  const [allUsers, setAllUsers] = useState(getAllUsers());
-  const [allTransactions, setAllTransactions] = useState(getAllTransactions());
-  const [searchQuery, setSearchQuery] = useState("");
-
-  const isUserAdmin = isAdmin();
-
-  const notifications = [
-    { id: "n1", title: "Deposit Confirmed", desc: "€5,000 deposited via Bank Transfer", time: "2h ago", read: false },
-    { id: "n2", title: "Price Alert", desc: "BTC/USD reached $64,000", time: "5h ago", read: false },
-    { id: "n3", title: "Trade Executed", desc: "EUR/USD Buy 0.5 lots at 1.1388", time: "5h ago", read: true },
-  ];
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [allTransactions, setAllTransactions] = useState<any[]>([]);
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setUser(getUser());
-    setBalance(getBalance());
-    setTrades(getTrades());
-    setTransactions(getTransactions());
-    if (isAdmin()) {
-      setAllUsers(getAllUsers());
-      setAllTransactions(getAllTransactions());
+    setMounted(true);
+    seedDemoData();
+
+    const token = getAuthToken();
+    const localUser = getUser();
+
+    if (!token && !localUser) {
+      router.push("/login/");
+      return;
     }
-  }, []);
 
-  const totalProfit = trades.reduce((sum, t) => sum + t.profit, 0);
-  const equity = balance + totalProfit;
-  const marginUsed = trades.reduce((sum, t) => sum + (t.openPrice * t.volume * 0.001), 0);
-  const freeMargin = equity - marginUsed;
-  const marginLevel = marginUsed > 0 ? (equity / marginUsed) * 100 : 0;
+    // If we have a token, verify with API
+    if (token) {
+      fetch("/api/auth/me/", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.user) {
+            setUserState(data.user);
+            setUser(data.user);
+          } else {
+            // Token invalid, fallback to localStorage
+            setUserState(localUser);
+          }
+          setLoading(false);
+        })
+        .catch(() => {
+          setUserState(localUser);
+          setLoading(false);
+        });
+    } else {
+      setUserState(localUser);
+      setLoading(false);
+    }
 
-  const recentActivity = transactions.slice(0, 3).map((t) => ({
-    id: t.id,
-    type: t.type,
-    amount: t.amount,
-    desc: `${t.type === "deposit" ? "Deposit" : "Withdrawal"} via ${t.method}`,
-    time: t.createdAt ? new Date(t.createdAt).toLocaleDateString() : "Recent",
-    status: t.status === "approved" ? "completed" : t.status,
-  }));
+    setBalanceState(getBalance());
+    setTradesState(getTrades());
+    setTransactionsState(getTransactions());
+  }, [router]);
 
-  // Admin functions
-  const handleApproveTx = (txId: string) => {
-    adminUpdateTransactionStatus(txId, "approved");
-    setAllTransactions(getAllTransactions());
-  };
+  // Admin data fetch
+  useEffect(() => {
+    if (!showAdminPanel || !user?.role === "admin") return;
+    const token = getAuthToken();
+    if (!token) return;
 
-  const handleRejectTx = (txId: string) => {
-    adminUpdateTransactionStatus(txId, "rejected");
-    setAllTransactions(getAllTransactions());
-  };
+    setAdminLoading(true);
+    if (adminTab === "users") {
+      fetch("/api/admin/users/", { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.json())
+        .then((d) => setAllUsers(d.users || []))
+        .finally(() => setAdminLoading(false));
+    } else if (adminTab === "transactions") {
+      fetch("/api/admin/transactions/", { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.json())
+        .then((d) => setAllTransactions(d.transactions || []))
+        .finally(() => setAdminLoading(false));
+    } else {
+      setAdminLoading(false);
+    }
+  }, [showAdminPanel, adminTab, user]);
 
-  const handleSuspendUser = (userId: string) => {
-    adminUpdateUserStatus(userId, "suspended");
-    setAllUsers(getAllUsers());
-  };
+  function handleLogout() {
+    clearClientAuth();
+    removeAuthToken();
+    router.push("/login/");
+  }
 
-  const handleActivateUser = (userId: string) => {
-    adminUpdateUserStatus(userId, "active");
-    setAllUsers(getAllUsers());
-  };
+  function isAdmin(): boolean {
+    return user?.role === "admin" || user?.email === "admin@axi.com";
+  }
 
-  const filteredUsers = allUsers.filter((u) => 
-    u.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    u.email?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  if (!mounted || loading) {
+    return (
+      <div className="min-h-screen bg-[#F5F2ED] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#D31C2B]"></div>
+      </div>
+    );
+  }
 
-  const pendingTransactions = allTransactions.filter((t) => t.status === "pending");
-  const totalUsers = allUsers.length;
-  const activeUsers = allUsers.filter((u) => u.status === "active").length;
-  const totalBalanceAll = allUsers.reduce((sum, u) => sum + (u.balance || 0), 0);
+  if (!user) {
+    router.push("/login/");
+    return null;
+  }
+
+  const equity = user?.equity || balance + trades.reduce((sum, t) => sum + (t.profit || 0), 0);
+  const freeMargin = user?.freeMargin || equity - (user?.margin || 0);
+  const marginLevel = user?.marginLevel || (user?.margin > 0 ? (equity / user.margin) * 100 : 0);
 
   return (
-    <div className="min-h-screen bg-axi-cream flex flex-col">
-      <header className="sticky top-0 z-50 bg-white border-b border-axi-border px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-bold text-axi-text">Dashboard</h1>
-            <p className="text-xs text-axi-text-muted">Account: {user?.id?.slice(-8) || "60332183"} | {user?.accountType ? user.accountType.charAt(0).toUpperCase() + user.accountType.slice(1) : "Standard"} ({user?.currency || "EUR"})</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Hidden admin toggle - only visible to admin, disguised as settings icon */}
-            {isUserAdmin && (
-              <button 
-                onClick={() => setShowAdminPanel(!showAdminPanel)} 
-                className={`p-2 rounded-lg transition-colors ${showAdminPanel ? "bg-axi-red text-white" : "hover:bg-axi-cream text-axi-text-muted"}`}
-                title="Admin Panel"
-              >
-                <Shield size={18} />
-              </button>
-            )}
-            <span className="px-2 py-1 bg-axi-success/10 text-axi-success text-[10px] font-bold rounded-lg uppercase">{user?.status === "active" ? "Verified" : "Pending"}</span>
-            <div className="relative">
-              <button onClick={() => setShowNotifications(!showNotifications)} className="relative p-2 rounded-lg hover:bg-axi-cream transition-colors">
-                <Bell size={18} className="text-axi-text" />
-                {notifications.some((n) => !n.read) && (
-                  <span className="absolute top-1 right-1 w-2 h-2 bg-axi-red rounded-full" />
-                )}
-              </button>
-              <AnimatePresence>
-                {showNotifications && (
-                  <motion.div initial={{ opacity: 0, y: -10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -10, scale: 0.95 }} className="absolute right-0 mt-2 w-80 bg-white border border-axi-border rounded-2xl shadow-2xl z-50 overflow-hidden">
-                    <div className="px-4 py-3 border-b border-axi-cream flex items-center justify-between">
-                      <h3 className="text-sm font-bold">Notifications</h3>
-                      <span className="text-[10px] text-axi-text-muted">{notifications.filter((n) => !n.read).length} unread</span>
-                    </div>
-                    <div className="max-h-64 overflow-y-auto">
-                      {notifications.map((n) => (
-                        <div key={n.id} className={`px-4 py-3 border-b border-axi-cream ${n.read ? "" : "bg-axi-cream/50"}`}>
-                          <div className="flex items-center gap-2">
-                            {!n.read && <span className="w-2 h-2 bg-axi-red rounded-full shrink-0" />}
-                            <p className="text-xs font-bold text-axi-text">{n.title}</p>
-                          </div>
-                          <p className="text-[10px] text-axi-text-muted mt-1">{n.desc}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-            <Link href="/settings/">
-              <div className="w-9 h-9 rounded-full bg-axi-black flex items-center justify-center text-white text-xs font-black cursor-pointer hover:bg-axi-red transition-colors">
-                {user?.name?.split(" ").map((n: string) => n[0]).join("") || "JD"}
-              </div>
+    <div className="min-h-screen bg-[#F5F2ED]">
+      {/* Header */}
+      <header className="bg-white border-b border-[#D9D3CB] sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <Link href="/" className="flex items-center gap-1">
+              <span className="text-2xl font-black text-[#D31C2B] tracking-tight">axi</span>
             </Link>
+
+            <div className="hidden md:flex items-center gap-6">
+              <Link href="/dashboard/" className="text-sm font-semibold text-[#D31C2B]">Dashboard</Link>
+              <Link href="/markets/" className="text-sm font-semibold text-[#1A1A1A] hover:text-[#D31C2B]">Markets</Link>
+              <Link href="/trading/" className="text-sm font-semibold text-[#1A1A1A] hover:text-[#D31C2B]">Trade</Link>
+              <Link href="/copy-trading/" className="text-sm font-semibold text-[#1A1A1A] hover:text-[#D31C2B]">Copy</Link>
+            </div>
+
+            <div className="flex items-center gap-4">
+              {isAdmin() && (
+                <button
+                  onClick={() => setShowAdminPanel(!showAdminPanel)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1A1A1A] text-white text-xs font-bold rounded-lg hover:bg-[#2D2D2D]"
+                >
+                  <Shield className="w-3.5 h-3.5" /> Admin
+                </button>
+              )}
+              <button onClick={() => setShowNotifications(!showNotifications)} className="relative p-2 hover:bg-[#F5F2ED] rounded-lg">
+                <Bell className="w-5 h-5 text-[#1A1A1A]" />
+                <span className="absolute top-1 right-1 w-2 h-2 bg-[#D31C2B] rounded-full"></span>
+              </button>
+              <button onClick={handleLogout} className="text-sm font-semibold text-[#6B6560] hover:text-[#D31C2B]">
+                Logout
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
-      {/* ADMIN PANEL - Hidden overlay, only for admin */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Balance Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white rounded-xl p-5 border border-[#D9D3CB]">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-[#6B6560] uppercase">Balance</span>
+              <button onClick={() => setHideBalance(!hideBalance)} className="text-[#9B9590]">
+                {hideBalance ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            <div className="text-2xl font-black text-[#1A1A1A]">
+              {hideBalance ? "****" : formatMoney(balance, user?.currency || "USD")}
+            </div>
+          </div>
+          <div className="bg-white rounded-xl p-5 border border-[#D9D3CB]">
+            <span className="text-xs font-semibold text-[#6B6560] uppercase block mb-2">Equity</span>
+            <div className="text-2xl font-black text-[#1A1A1A]">{hideBalance ? "****" : formatMoney(equity, user?.currency || "USD")}</div>
+          </div>
+          <div className="bg-white rounded-xl p-5 border border-[#D9D3CB]">
+            <span className="text-xs font-semibold text-[#6B6560] uppercase block mb-2">Free Margin</span>
+            <div className="text-2xl font-black text-[#1A1A1A]">{hideBalance ? "****" : formatMoney(freeMargin, user?.currency || "USD")}</div>
+          </div>
+          <div className="bg-white rounded-xl p-5 border border-[#D9D3CB]">
+            <span className="text-xs font-semibold text-[#6B6560] uppercase block mb-2">Margin Level</span>
+            <div className={`text-2xl font-black ${marginLevel < 100 ? "text-[#D31C2B]" : "text-[#22A958]"}`}>
+              {marginLevel.toFixed(1)}%
+            </div>
+          </div>
+        </div>
+
+        {/* Platform Selector + Quick Actions */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
+          <div className="flex bg-white rounded-lg border border-[#D9D3CB] p-1">
+            {PLATFORMS.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => setActivePlatform(p.id)}
+                className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${
+                  activePlatform === p.id
+                    ? "bg-[#1A1A1A] text-white"
+                    : "text-[#6B6560] hover:text-[#1A1A1A]"
+                }`}
+              >
+                {p.name}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-3">
+            <Link href="/deposit/" className="flex items-center gap-2 px-4 py-2.5 bg-[#22A958] text-white text-sm font-bold rounded-lg hover:bg-[#1E8A4A]">
+              <ArrowDownRight className="w-4 h-4" /> Deposit
+            </Link>
+            <Link href="/withdraw/" className="flex items-center gap-2 px-4 py-2.5 bg-[#D31C2B] text-white text-sm font-bold rounded-lg hover:bg-[#B91623]">
+              <ArrowUpRight className="w-4 h-4" /> Withdraw
+            </Link>
+            <Link href="/trading/" className="flex items-center gap-2 px-4 py-2.5 bg-[#1A1A1A] text-white text-sm font-bold rounded-lg hover:bg-[#2D2D2D]">
+              <BarChart3 className="w-4 h-4" /> Trade
+            </Link>
+          </div>
+        </div>
+
+        {/* Open Trades */}
+        <div className="bg-white rounded-xl border border-[#D9D3CB] mb-8">
+          <div className="px-6 py-4 border-b border-[#D9D3CB] flex items-center justify-between">
+            <h2 className="text-lg font-bold text-[#1A1A1A]">Open Positions</h2>
+            <span className="text-sm text-[#6B6560]">{trades.length} active</span>
+          </div>
+          <div className="overflow-x-auto">
+            {trades.length === 0 ? (
+              <div className="px-6 py-12 text-center text-[#6B6560]">
+                <BarChart3 className="w-12 h-12 mx-auto mb-3 text-[#D9D3CB]" />
+                <p className="text-sm">No open positions. Start trading now.</p>
+                <Link href="/trading/" className="inline-block mt-3 text-[#D31C2B] font-semibold text-sm hover:underline">
+                  Open Trade
+                </Link>
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-[#F5F2ED]">
+                  <tr>
+                    <th className="px-6 py-3 text-left font-semibold text-[#6B6560]">Symbol</th>
+                    <th className="px-6 py-3 text-left font-semibold text-[#6B6560]">Type</th>
+                    <th className="px-6 py-3 text-right font-semibold text-[#6B6560]">Volume</th>
+                    <th className="px-6 py-3 text-right font-semibold text-[#6B6560]">Open Price</th>
+                    <th className="px-6 py-3 text-right font-semibold text-[#6B6560]">Current</th>
+                    <th className="px-6 py-3 text-right font-semibold text-[#6B6560]">Profit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trades.map((trade) => (
+                    <tr key={trade.id} className="border-t border-[#D9D3CB]">
+                      <td className="px-6 py-3 font-semibold">{trade.symbol}</td>
+                      <td className="px-6 py-3">
+                        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-bold ${
+                          trade.type === "buy" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                        }`}>
+                          {trade.type.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3 text-right">{trade.volume.toFixed(2)}</td>
+                      <td className="px-6 py-3 text-right">{trade.openPrice?.toFixed(5) || "—"}</td>
+                      <td className="px-6 py-3 text-right">{trade.currentPrice?.toFixed(5) || "—"}</td>
+                      <td className={`px-6 py-3 text-right font-bold ${trade.profit >= 0 ? "text-[#22A958]" : "text-[#D31C2B]"}`}>
+                        {trade.profit >= 0 ? "+" : ""}{formatMoney(trade.profit, user?.currency || "USD")}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+
+        {/* Recent Transactions */}
+        <div className="bg-white rounded-xl border border-[#D9D3CB]">
+          <div className="px-6 py-4 border-b border-[#D9D3CB] flex items-center justify-between">
+            <h2 className="text-lg font-bold text-[#1A1A1A]">Recent Transactions</h2>
+            <Link href="/wallet/" className="text-sm text-[#D31C2B] font-semibold hover:underline">View All</Link>
+          </div>
+          <div className="overflow-x-auto">
+            {transactions.length === 0 ? (
+              <div className="px-6 py-8 text-center text-[#6B6560] text-sm">No transactions yet.</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-[#F5F2ED]">
+                  <tr>
+                    <th className="px-6 py-3 text-left font-semibold text-[#6B6560]">Type</th>
+                    <th className="px-6 py-3 text-right font-semibold text-[#6B6560]">Amount</th>
+                    <th className="px-6 py-3 text-left font-semibold text-[#6B6560]">Method</th>
+                    <th className="px-6 py-3 text-left font-semibold text-[#6B6560]">Status</th>
+                    <th className="px-6 py-3 text-left font-semibold text-[#6B6560]">Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transactions.slice(0, 10).map((tx) => (
+                    <tr key={tx.id} className="border-t border-[#D9D3CB]">
+                      <td className="px-6 py-3">
+                        <span className={`inline-flex items-center gap-1 text-xs font-bold ${
+                          tx.type === "deposit" ? "text-[#22A958]" : "text-[#D31C2B]"
+                        }`}>
+                          {tx.type === "deposit" ? <ArrowDownRight className="w-3.5 h-3.5" /> : <ArrowUpRight className="w-3.5 h-3.5" />}
+                          {tx.type.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3 text-right font-semibold">{formatMoney(tx.amount, tx.currency)}</td>
+                      <td className="px-6 py-3 text-[#6B6560]">{tx.method}</td>
+                      <td className="px-6 py-3">
+                        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-bold ${
+                          tx.status === "approved" ? "bg-green-100 text-green-700" :
+                          tx.status === "rejected" ? "bg-red-100 text-red-700" :
+                          "bg-yellow-100 text-yellow-700"
+                        }`}>
+                          {tx.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3 text-[#6B6560]">
+                        {tx.createdAt ? new Date(tx.createdAt).toLocaleDateString() : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </main>
+
+      {/* Admin Panel Overlay */}
       <AnimatePresence>
-        {showAdminPanel && isUserAdmin && (
-          <motion.div 
-            initial={{ opacity: 0, height: 0 }} 
-            animate={{ opacity: 1, height: "auto" }} 
-            exit={{ opacity: 0, height: 0 }}
-            className="bg-axi-black border-b border-axi-border overflow-hidden"
+        {showAdminPanel && isAdmin() && (
+          <motion.div
+            initial={{ opacity: 0, x: 300 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 300 }}
+            className="fixed inset-y-0 right-0 w-full max-w-2xl bg-white shadow-2xl border-l border-[#D9D3CB] z-50 overflow-y-auto"
           >
-            <div className="px-4 py-4">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Shield size={18} className="text-axi-red" />
-                  <h2 className="text-white font-bold text-sm">Admin Control Panel</h2>
-                  <span className="px-2 py-0.5 bg-axi-red/20 text-axi-red text-[10px] font-bold rounded uppercase">ADMIN</span>
-                </div>
-                <button onClick={() => setShowAdminPanel(false)} className="text-white/40 hover:text-white">
-                  <X size={18} />
+            <div className="p-6 border-b border-[#D9D3CB] flex items-center justify-between">
+              <h2 className="text-xl font-black text-[#1A1A1A] flex items-center gap-2">
+                <Shield className="w-5 h-5 text-[#D31C2B]" /> Admin Panel
+              </h2>
+              <button onClick={() => setShowAdminPanel(false)} className="p-2 hover:bg-[#F5F2ED] rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex border-b border-[#D9D3CB]">
+              {(["overview", "users", "transactions"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setAdminTab(tab)}
+                  className={`px-6 py-3 text-sm font-semibold capitalize border-b-2 transition-all ${
+                    adminTab === tab ? "border-[#D31C2B] text-[#D31C2B]" : "border-transparent text-[#6B6560]"
+                  }`}
+                >
+                  {tab}
                 </button>
-              </div>
+              ))}
+            </div>
 
-              {/* Admin Tabs */}
-              <div className="flex gap-2 mb-4 overflow-x-auto">
-                {(["overview", "users", "transactions", "kyc"] as const).map((tab) => (
-                  <button key={tab} onClick={() => setAdminTab(tab)} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase whitespace-nowrap transition-colors ${adminTab === tab ? "bg-axi-red text-white" : "bg-white/10 text-white/60 hover:bg-white/20"}`}>
-                    {tab}
-                  </button>
-                ))}
-              </div>
-
-              {/* Admin Content */}
-              <div className="space-y-3">
-                {adminTab === "overview" && (
-                  <div className="grid grid-cols-4 gap-2">
-                    <div className="p-3 bg-white/10 rounded-xl">
-                      <p className="text-[10px] text-white/40 uppercase">Total Users</p>
-                      <p className="text-xl font-black text-white">{totalUsers}</p>
-                      <p className="text-[10px] text-axi-success">{activeUsers} active</p>
-                    </div>
-                    <div className="p-3 bg-white/10 rounded-xl">
-                      <p className="text-[10px] text-white/40 uppercase">Total Balance</p>
-                      <p className="text-xl font-black text-axi-gold">€{totalBalanceAll.toLocaleString()}</p>
-                    </div>
-                    <div className="p-3 bg-white/10 rounded-xl">
-                      <p className="text-[10px] text-white/40 uppercase">Pending TX</p>
-                      <p className="text-xl font-black text-axi-red">{pendingTransactions.length}</p>
-                    </div>
-                    <div className="p-3 bg-white/10 rounded-xl">
-                      <p className="text-[10px] text-white/40 uppercase">KYC Pending</p>
-                      <p className="text-xl font-black text-white">0</p>
-                    </div>
-                  </div>
-                )}
-
-                {adminTab === "users" && (
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    <div className="relative">
-                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
-                      <input 
-                        type="text" 
-                        value={searchQuery} 
-                        onChange={(e) => setSearchQuery(e.target.value)} 
-                        placeholder="Search users..." 
-                        className="w-full pl-9 pr-3 py-2 bg-white/10 rounded-lg text-xs text-white placeholder:text-white/40 outline-none border border-white/10"
-                      />
-                    </div>
-                    {filteredUsers.map((u) => (
-                      <div key={u.id} className="p-3 bg-white/10 rounded-xl flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-axi-red flex items-center justify-center text-white text-xs font-bold">{u.name?.charAt(0)}</div>
-                          <div>
-                            <p className="text-xs text-white font-bold">{u.name}</p>
-                            <p className="text-[10px] text-white/40">{u.email} · {u.country}</p>
-                          </div>
+            <div className="p-6">
+              {adminLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#D31C2B]"></div>
+                </div>
+              ) : adminTab === "users" ? (
+                <div className="space-y-3">
+                  {allUsers.length === 0 ? (
+                    <p className="text-center text-[#6B6560] py-8">No users found.</p>
+                  ) : (
+                    allUsers.map((u) => (
+                      <div key={u.id} className="flex items-center justify-between p-4 bg-[#F5F2ED] rounded-lg">
+                        <div>
+                          <p className="font-semibold text-[#1A1A1A]">{u.name || u.email}</p>
+                          <p className="text-xs text-[#6B6560]">{u.email} · {u.country || "N/A"}</p>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${u.status === "active" ? "bg-axi-success/20 text-axi-success" : "bg-axi-red/20 text-axi-red"}`}>{u.status}</span>
-                          {u.status === "active" ? (
-                            <button onClick={() => handleSuspendUser(u.id)} className="p-1 rounded hover:bg-white/20 text-white/40 hover:text-axi-red transition-colors">
-                              <X size={12} />
-                            </button>
-                          ) : (
-                            <button onClick={() => handleActivateUser(u.id)} className="p-1 rounded hover:bg-white/20 text-white/40 hover:text-axi-success transition-colors">
-                              <Check size={12} />
-                            </button>
-                          )}
+                        <div className="flex items-center gap-3">
+                          <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                            u.status === "active" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                          }`}>{u.status}</span>
+                          <span className="text-sm font-semibold">{formatMoney(u.balance || 0, u.currency || "USD")}</span>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-
-                {adminTab === "transactions" && (
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {pendingTransactions.length === 0 ? (
-                      <p className="text-xs text-white/40 text-center py-4">No pending transactions</p>
-                    ) : (
-                      pendingTransactions.map((t) => (
-                        <div key={t.id} className="p-3 bg-white/10 rounded-xl">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${t.type === "deposit" ? "bg-axi-success/20" : "bg-axi-red/20"}`}>
-                                {t.type === "deposit" ? <ArrowUpRight size={12} className="text-axi-success" /> : <ArrowDownRight size={12} className="text-axi-red" />}
-                              </div>
-                              <div>
-                                <p className="text-xs text-white font-bold">{t.userId}</p>
-                                <p className="text-[10px] text-white/40">{t.type} · {t.method} · €{t.amount}</p>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <button onClick={() => handleApproveTx(t.id)} className="flex-1 py-1.5 bg-axi-success text-white text-[10px] font-bold rounded-lg uppercase">Approve</button>
-                            <button onClick={() => handleRejectTx(t.id)} className="flex-1 py-1.5 bg-axi-red text-white text-[10px] font-bold rounded-lg uppercase">Reject</button>
-                          </div>
+                    ))
+                  )}
+                </div>
+              ) : adminTab === "transactions" ? (
+                <div className="space-y-3">
+                  {allTransactions.length === 0 ? (
+                    <p className="text-center text-[#6B6560] py-8">No transactions found.</p>
+                  ) : (
+                    allTransactions.map((tx) => (
+                      <div key={tx.id} className="flex items-center justify-between p-4 bg-[#F5F2ED] rounded-lg">
+                        <div>
+                          <p className="font-semibold text-[#1A1A1A]">{tx.type.toUpperCase()} · {tx.user?.name || tx.user?.email || "Unknown"}</p>
+                          <p className="text-xs text-[#6B6560]">{tx.method} · {tx.currency}</p>
                         </div>
-                      ))
-                    )}
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-bold">{formatMoney(tx.amount, tx.currency)}</span>
+                          <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                            tx.status === "approved" ? "bg-green-100 text-green-700" :
+                            tx.status === "rejected" ? "bg-red-100 text-red-700" :
+                            "bg-yellow-100 text-yellow-700"
+                          }`}>{tx.status}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-[#F5F2ED] rounded-xl p-6 text-center">
+                    <Users className="w-8 h-8 mx-auto mb-2 text-[#D31C2B]" />
+                    <p className="text-3xl font-black">{allUsers.length}</p>
+                    <p className="text-sm text-[#6B6560]">Total Users</p>
                   </div>
-                )}
-
-                {adminTab === "kyc" && (
-                  <div className="p-4 bg-white/10 rounded-xl text-center">
-                    <FileText size={24} className="mx-auto text-white/40 mb-2" />
-                    <p className="text-xs text-white/40">KYC verification system</p>
-                    <p className="text-[10px] text-white/30 mt-1">Document review and verification management</p>
+                  <div className="bg-[#F5F2ED] rounded-xl p-6 text-center">
+                    <Wallet className="w-8 h-8 mx-auto mb-2 text-[#22A958]" />
+                    <p className="text-3xl font-black">{allTransactions.filter((t) => t.status === "approved").length}</p>
+                    <p className="text-sm text-[#6B6560]">Approved Transactions</p>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-
-      <div className="flex-1 px-4 py-5 space-y-5 overflow-y-auto pb-24">
-        {/* Account Balance Cards */}
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { label: "Balance", value: formatMoney(balance), icon: Wallet, color: "#1A1A1A" },
-            { label: "Equity", value: formatMoney(equity), icon: TrendingUp, color: "#F5C842" },
-            { label: "Margin", value: formatMoney(marginUsed), icon: TrendingDown, color: "#D31C2B" },
-            { label: "Free Margin", value: formatMoney(freeMargin), icon: TrendingUp, color: "#22A958" },
-          ].map((s) => (
-            <div key={s.label} className="p-4 bg-white rounded-2xl border border-axi-border">
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-[10px] text-axi-text-muted font-bold uppercase tracking-wider">{s.label}</p>
-                <s.icon size={14} style={{ color: s.color }} />
-              </div>
-              <p className="text-lg font-black text-axi-text font-mono-abi">{hideBalance ? "••••••" : s.value}</p>
-            </div>
-          ))}
-        </div>
-
-        <button onClick={() => setHideBalance(!hideBalance)} className="flex items-center gap-1 text-[10px] text-axi-text-muted font-bold">
-          {hideBalance ? <Eye size={12} /> : <EyeOff size={12} />} {hideBalance ? "Show Balance" : "Hide Balance"}
-        </button>
-
-        {/* Quick Actions */}
-        <div className="grid grid-cols-2 gap-3">
-          <Link href="/deposit/"><motion.button whileTap={{ scale: 0.97 }} className="w-full py-3.5 rounded-xl bg-axi-gold text-axi-black font-bold text-sm flex items-center justify-center gap-2"><ArrowUpRight size={16} /> Deposit</motion.button></Link>
-          <Link href="/withdraw/"><motion.button whileTap={{ scale: 0.97 }} className="w-full py-3.5 rounded-xl border-2 border-axi-red text-axi-red font-bold text-sm flex items-center justify-center gap-2"><ArrowDownRight size={16} /> Withdraw</motion.button></Link>
-        </div>
-
-        {/* Platform Selector */}
-        <div className="p-5 bg-white rounded-2xl border border-axi-border">
-          <h2 className="text-xs font-bold text-axi-text-muted uppercase tracking-wider mb-4">Trading Platforms</h2>
-          <div className="space-y-2">
-            {PLATFORMS.map((p) => (
-              <button key={p.id} onClick={() => setActivePlatform(p.id)} className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all ${activePlatform === p.id ? "bg-axi-cream border border-axi-red" : "hover:bg-axi-cream border border-transparent"}`}>
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${activePlatform === p.id ? "bg-axi-red" : "bg-axi-border"}`}>
-                  <Monitor size={18} className="text-white" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-bold text-axi-text">{p.label}</p>
-                  <p className="text-[10px] text-axi-text-muted">{p.description}</p>
-                </div>
-                {activePlatform === p.id && (
-                  <Link href={p.id === "mt4" ? "/mt4-webtrader/" : p.id === "mt5" ? "/mt5-webtrader/" : "/trading/"}>
-                    <motion.button whileTap={{ scale: 0.95 }} className="px-3 py-1.5 bg-axi-red text-white text-[10px] font-bold rounded-lg uppercase">Launch</motion.button>
-                  </Link>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Open Positions */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-bold text-axi-text-muted uppercase tracking-wider">Open Positions ({trades.length})</h2>
-            <Link href="/trading/" className="text-[10px] text-axi-red font-bold">View All</Link>
-          </div>
-          {trades.length === 0 ? (
-            <div className="p-6 bg-white rounded-2xl border border-axi-border text-center">
-              <p className="text-sm text-axi-text-muted">No open positions</p>
-              <Link href="/trading/"><motion.button whileTap={{ scale: 0.97 }} className="mt-3 px-4 py-2 bg-axi-red text-white text-xs font-bold rounded-lg">Start Trading</motion.button></Link>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {trades.slice(0, 3).map((t) => (
-                <div key={t.id} className="p-4 bg-white rounded-2xl border border-axi-border">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${t.type === "buy" ? "bg-axi-success/10 text-axi-success" : "bg-axi-red/10 text-axi-red"}`}>{t.type}</span>
-                      <p className="text-sm font-bold text-axi-text">{t.symbol}</p>
-                      <p className="text-[10px] text-axi-text-muted">{t.volume} lots</p>
-                    </div>
-                    <p className={`text-sm font-black font-mono-abi ${t.profit >= 0 ? "text-axi-success" : "text-axi-red"}`}>{t.profit >= 0 ? "+" : ""}€{t.profit.toFixed(2)}</p>
-                  </div>
-                  <div className="flex items-center justify-between text-[10px] text-axi-text-muted">
-                    <span>Open: {t.openPrice}</span>
-                    <span>Current: {t.currentPrice}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Recent Activity */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-bold text-axi-text-muted uppercase tracking-wider">Recent Activity</h2>
-            <Link href="/wallet/" className="text-[10px] text-axi-red font-bold">View All</Link>
-          </div>
-          {recentActivity.length === 0 ? (
-            <div className="p-4 bg-white rounded-2xl border border-axi-border text-center">
-              <p className="text-sm text-axi-text-muted">No recent activity</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {recentActivity.map((a) => (
-                <div key={a.id} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-axi-border">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${a.type === "deposit" ? "bg-axi-success/10" : "bg-axi-red/10"}`}>
-                    {a.type === "deposit" ? <ArrowUpRight size={14} className="text-axi-success" /> : <ArrowDownRight size={14} className="text-axi-red" />}
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs font-bold text-axi-text">{a.desc}</p>
-                    <p className="text-[10px] text-axi-text-muted">{a.time}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className={`text-xs font-bold ${a.type === "deposit" ? "text-axi-success" : "text-axi-red"}`}>{a.type === "deposit" ? "+" : "-"}€{a.amount.toLocaleString()}</p>
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${a.status === "completed" ? "bg-axi-success/10 text-axi-success" : a.status === "pending" ? "bg-axi-gold/10 text-axi-gold" : "bg-axi-red/10 text-axi-red"}`}>
-                      {a.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Quick Links */}
-        <div className="grid grid-cols-2 gap-3">
-          <Link href="/markets/"><motion.button whileTap={{ scale: 0.97 }} className="w-full py-3 bg-axi-black text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2"><Compass size={14} /> Markets</motion.button></Link>
-          <Link href="/copy-trading/"><motion.button whileTap={{ scale: 0.97 }} className="w-full py-3 bg-axi-black text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2"><Copy size={14} /> Copy Trading</motion.button></Link>
-          <Link href="/helpcenter/"><motion.button whileTap={{ scale: 0.97 }} className="w-full py-3 bg-axi-black text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2"><BarChart3 size={14} /> Help Center</motion.button></Link>
-          <Link href="/settings/"><motion.button whileTap={{ scale: 0.97 }} className="w-full py-3 bg-axi-black text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2"><Settings size={14} /> Settings</motion.button></Link>
-        </div>
-      </div>
 
       <LiveChatBot />
     </div>

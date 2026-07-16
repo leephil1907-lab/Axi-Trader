@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { prisma } from "./prisma";
 
-const JWT_SECRET = process.env.JWT_SECRET || "axi-trader-default-secret";
+const JWT_SECRET = process.env.JWT_SECRET || "axi-trader-default-secret-min-32-chars-long";
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
 
 export async function hashPassword(password: string): Promise<string> {
@@ -34,25 +34,12 @@ export async function getUserFromToken(token: string) {
     where: { id: decoded.userId },
     select: {
       id: true, email: true, firstName: true, lastName: true,
-      role: true, status: true, balance: true, equity: true,
-      margin: true, freeMargin: true, kycStatus: true,
+      name: true, role: true, status: true, balance: true, equity: true,
+      margin: true, freeMargin: true, kycStatus: true, currency: true,
+      country: true, language: true, accountType: true, platform: true,
+      createdAt: true,
     },
   });
 
   return user;
-}
-
-export function getAuthToken(): string | null {
-  if (typeof document === "undefined") return null;
-  return localStorage.getItem("axi_token");
-}
-
-export function setAuthToken(token: string): void {
-  if (typeof document === "undefined") return;
-  localStorage.setItem("axi_token", token);
-}
-
-export function removeAuthToken(): void {
-  if (typeof document === "undefined") return;
-  localStorage.removeItem("axi_token");
 }

@@ -2,309 +2,212 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Lock, User, Eye, EyeOff, ChevronDown, Check, Globe, Monitor, Award, Shield, ArrowRight, Smartphone } from "lucide-react";
-import { COUNTRIES, LANGUAGES, CURRENCIES, ACCOUNT_TYPES, PLATFORMS } from "@/lib/countries";
-import { setUser, setBalance } from "@/lib/backend";
-import LiveChatBot from "@/components/LiveChatBot";
+import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
+import {
+  Eye, EyeOff, Mail, Lock, User, Globe, Phone, ArrowRight,
+  AlertTriangle, CheckCircle
+} from "lucide-react";
+import { COUNTRIES } from "@/lib/countries";
+import { setAuthToken, setClientUser } from "@/lib/client-auth";
 
 export default function RegisterPage() {
-  const [step, setStep] = useState(1);
+  const router = useRouter();
   const [form, setForm] = useState({
-    firstName: "", lastName: "", email: "", password: "", confirmPassword: "",
-    country: "Germany", language: "en", currency: "EUR", accountType: "standard", platform: "mt5", phone: "",
-    agreeTerms: false, agreeRisk: false, agreeMarketing: false,
+    firstName: "", lastName: "", email: "", phone: "",
+    country: "US", password: "", confirmPassword: "",
   });
-  const [showPass, setShowPass] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
 
-  const totalSteps = 4;
-  const progress = (step / totalSteps) * 100;
+  function updateField(field: string, value: string) {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  }
 
-  const selectedCurrency = CURRENCIES.find((c) => c.code === form.currency);
-  const selectedAccount = ACCOUNT_TYPES.find((a) => a.id === form.accountType);
-  const selectedPlatform = PLATFORMS.find((p) => p.id === form.platform);
-  const selectedLanguage = LANGUAGES.find((l) => l.code === form.language);
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
 
-  const handleNext = () => { if (step < totalSteps) setStep(step + 1); };
-  const handleBack = () => { if (step > 1) setStep(step - 1); };
-  const updateForm = (key: string, value: string | boolean) => { setForm((prev) => ({ ...prev, [key]: value })); setOpenDropdown(null); };
+    if (form.password !== form.confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+    if (form.password.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
 
-  const handleSubmit = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      const user = {
-        id: "user-" + Date.now(),
-        email: form.email,
-        name: `${form.firstName} ${form.lastName}`,
-        role: "user" as const,
-        status: "active" as const,
-        balance: 0,
-        equity: 0,
-        margin: 0,
-        freeMargin: 0,
-        marginLevel: 0,
-        totalProfit: 0,
-        totalLoss: 0,
-        createdAt: new Date(),
-        country: form.country,
-        language: form.language,
-        currency: form.currency,
-        accountType: form.accountType,
-        platform: form.platform,
-        phone: form.phone,
-      };
-      setUser(user);
-      setBalance(0);
-      setIsLoading(false);
-      window.location.href = "/dashboard/";
-    }, 2000);
-  };
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/register/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName: form.firstName,
+          lastName: form.lastName,
+          email: form.email,
+          password: form.password,
+          phone: form.phone,
+          country: form.country,
+        }),
+      });
 
-  const Dropdown = ({ label, value, options, onSelect, renderOption }: any) => (
-    <div className="relative">
-      <label className="text-xs text-axi-text-muted font-bold uppercase tracking-wider mb-2 block">{label}</label>
-      <button onClick={() => setOpenDropdown(openDropdown === label ? null : label)} className="w-full px-4 py-3.5 bg-axi-cream border border-axi-border rounded-xl text-sm text-axi-text flex items-center justify-between hover:border-axi-red/30 transition-colors">
-        <span>{value}</span>
-        <ChevronDown size={16} className={`text-axi-text-muted transition-transform ${openDropdown === label ? "rotate-180" : ""}`} />
-      </button>
-      <AnimatePresence>
-        {openDropdown === label && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="absolute z-50 w-full mt-1 max-h-60 overflow-y-auto bg-white border border-axi-border rounded-xl shadow-2xl">
-            {options.map((opt: any, i: number) => (
-              <button key={i} onClick={() => onSelect(opt)} className="w-full px-4 py-2.5 text-left text-sm text-axi-text hover:bg-axi-cream hover:text-axi-text transition-colors flex items-center justify-between">
-                {renderOption ? renderOption(opt) : opt}
-              </button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Registration failed");
+        setLoading(false);
+        return;
+      }
+
+      setAuthToken(data.token);
+      setClientUser(data.user);
+      setSuccess(true);
+      setTimeout(() => router.push("/dashboard/"), 800);
+    } catch (err: any) {
+      setError("Network error. Please try again.");
+      setLoading(false);
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-axi-cream flex flex-col">
-      <div className="px-4 py-3 flex items-center justify-between bg-white border-b border-axi-border">
-        <svg viewBox="0 0 200 60" className="w-16 h-auto">
-          <text x="5" y="45" fontFamily="Arial, sans-serif" fontSize="40" fontWeight="900" fill="#D31C2B" letterSpacing="-2">axi</text>
-          <polygon points="100,8 113,8 107,22" fill="#D31C2B" />
-        </svg>
-        <div className="relative">
-          <button onClick={() => setOpenDropdown(openDropdown === "lang" ? null : "lang")} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-axi-cream text-axi-text-muted text-xs hover:bg-axi-beige transition-colors">
-            <Globe size={14} /><span>{selectedLanguage?.label}</span>
-            <ChevronDown size={12} className={`transition-transform ${openDropdown === "lang" ? "rotate-180" : ""}`} />
+    <div className="min-h-screen bg-[#F5F2ED] flex items-center justify-center px-4 py-8">
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-lg bg-white rounded-2xl shadow-xl p-8 border border-[#D9D3CB]"
+      >
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-black text-[#1A1A1A] tracking-tight">
+            <span className="text-[#D31C2B]">axi</span> Account
+          </h1>
+          <p className="text-[#6B6560] mt-2 text-sm">Create your trading account in minutes</p>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-600 text-sm">
+            <AlertTriangle className="w-4 h-4" /> {error}
+          </div>
+        )}
+        {success && (
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-600 text-sm">
+            <CheckCircle className="w-4 h-4" /> Account created! Redirecting...
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-[#1A1A1A] mb-1.5">First Name</label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9B9590]" />
+                <input
+                  required value={form.firstName}
+                  onChange={(e) => updateField("firstName", e.target.value)}
+                  className="w-full pl-10 pr-3 py-2.5 rounded-lg border border-[#D9D3CB] text-sm focus:outline-none focus:ring-2 focus:ring-[#D31C2B]/20 focus:border-[#D31C2B]"
+                  placeholder="John"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-[#1A1A1A] mb-1.5">Last Name</label>
+              <input
+                required value={form.lastName}
+                onChange={(e) => updateField("lastName", e.target.value)}
+                className="w-full px-3 py-2.5 rounded-lg border border-[#D9D3CB] text-sm focus:outline-none focus:ring-2 focus:ring-[#D31C2B]/20 focus:border-[#D31C2B]"
+                placeholder="Doe"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-[#1A1A1A] mb-1.5">Email</label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9B9590]" />
+              <input
+                type="email" required value={form.email}
+                onChange={(e) => updateField("email", e.target.value)}
+                className="w-full pl-10 pr-3 py-2.5 rounded-lg border border-[#D9D3CB] text-sm focus:outline-none focus:ring-2 focus:ring-[#D31C2B]/20 focus:border-[#D31C2B]"
+                placeholder="you@example.com"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-[#1A1A1A] mb-1.5">Phone</label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9B9590]" />
+                <input
+                  type="tel" value={form.phone}
+                  onChange={(e) => updateField("phone", e.target.value)}
+                  className="w-full pl-10 pr-3 py-2.5 rounded-lg border border-[#D9D3CB] text-sm focus:outline-none focus:ring-2 focus:ring-[#D31C2B]/20 focus:border-[#D31C2B]"
+                  placeholder="+1 234 567 890"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-[#1A1A1A] mb-1.5">Country</label>
+              <div className="relative">
+                <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9B9590]" />
+                <select
+                  value={form.country}
+                  onChange={(e) => updateField("country", e.target.value)}
+                  className="w-full pl-10 pr-3 py-2.5 rounded-lg border border-[#D9D3CB] text-sm focus:outline-none focus:ring-2 focus:ring-[#D31C2B]/20 focus:border-[#D31C2B] bg-white"
+                >
+                  {COUNTRIES.map((c) => (
+                    <option key={c.code} value={c.code}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-[#1A1A1A] mb-1.5">Password</label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9B9590]" />
+              <input
+                type={showPassword ? "text" : "password"} required
+                value={form.password}
+                onChange={(e) => updateField("password", e.target.value)}
+                className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-[#D9D3CB] text-sm focus:outline-none focus:ring-2 focus:ring-[#D31C2B]/20 focus:border-[#D31C2B]"
+                placeholder="Min 6 characters"
+              />
+              <button type="button" onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9B9590]">
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-[#1A1A1A] mb-1.5">Confirm Password</label>
+            <input
+              type={showPassword ? "text" : "password"} required
+              value={form.confirmPassword}
+              onChange={(e) => updateField("confirmPassword", e.target.value)}
+              className="w-full px-3 py-2.5 rounded-lg border border-[#D9D3CB] text-sm focus:outline-none focus:ring-2 focus:ring-[#D31C2B]/20 focus:border-[#D31C2B]"
+              placeholder="Repeat password"
+            />
+          </div>
+
+          <button
+            type="submit" disabled={loading}
+            className="w-full py-3 bg-[#D31C2B] hover:bg-[#B91623] text-white font-bold rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {loading ? "Creating account..." : "Create Account"}
+            <ArrowRight className="w-4 h-4" />
           </button>
-          <AnimatePresence>
-            {openDropdown === "lang" && (
-              <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="absolute right-0 mt-1 w-48 bg-white border border-axi-border rounded-xl shadow-2xl overflow-hidden z-50 max-h-60 overflow-y-auto">
-                {LANGUAGES.map((l) => (
-                  <button key={l.code} onClick={() => updateForm("language", l.code)} className={`w-full px-3 py-2.5 text-left text-xs hover:bg-axi-cream transition-colors ${form.language === l.code ? "text-axi-red font-bold" : "text-axi-text-muted"}`}>{l.label}</button>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
+        </form>
+
+        <div className="mt-6 text-center text-sm text-[#6B6560]">
+          Already have an account?{" "}
+          <Link href="/login/" className="text-[#D31C2B] font-semibold hover:underline">Sign In</Link>
         </div>
-      </div>
-
-      <div className="flex-1 flex items-center justify-center px-4 py-8">
-        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
-          <div className="text-center mb-8">
-            <svg viewBox="0 0 200 60" className="w-28 h-auto mx-auto mb-4">
-              <text x="10" y="50" fontFamily="Arial, sans-serif" fontSize="48" fontWeight="900" fill="#D31C2B" letterSpacing="-2">axi</text>
-              <polygon points="118,10 135,10 127,28" fill="#D31C2B" />
-            </svg>
-            <h1 className="text-2xl font-black text-axi-text mb-2">Create Your Account</h1>
-            <p className="text-axi-text-muted text-sm">Start trading in minutes</p>
-          </div>
-
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-axi-text-muted font-bold">Step {step} of {totalSteps}</span>
-              <span className="text-xs text-axi-gold font-bold">{Math.round(progress)}%</span>
-            </div>
-            <div className="h-1.5 bg-axi-border rounded-full overflow-hidden">
-              <motion.div className="h-full bg-axi-gold rounded-full" initial={{ width: 0 }} animate={{ width: `${progress}%` }} transition={{ duration: 0.4 }} />
-            </div>
-          </div>
-
-          <div className="bg-white border border-axi-border rounded-2xl p-6 space-y-5 shadow-sm">
-            <AnimatePresence mode="wait">
-              {step === 1 && (
-                <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
-                  <h2 className="text-lg font-bold text-axi-text mb-1">Personal Details</h2>
-                  <p className="text-xs text-axi-text-muted mb-4">Enter your name and contact information</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs text-axi-text-muted font-bold uppercase tracking-wider mb-2 block">First Name</label>
-                      <div className="relative">
-                        <User size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-axi-text-muted" />
-                        <input type="text" value={form.firstName} onChange={(e) => updateForm("firstName", e.target.value)} placeholder="John" className="w-full pl-11 pr-4 py-3.5 bg-axi-cream border border-axi-border rounded-xl text-sm text-axi-text placeholder:text-axi-text-muted outline-none focus:border-axi-red/50 transition-colors" />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-xs text-axi-text-muted font-bold uppercase tracking-wider mb-2 block">Last Name</label>
-                      <input type="text" value={form.lastName} onChange={(e) => updateForm("lastName", e.target.value)} placeholder="Doe" className="w-full px-4 py-3.5 bg-axi-cream border border-axi-border rounded-xl text-sm text-axi-text placeholder:text-axi-text-muted outline-none focus:border-axi-red/50 transition-colors" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-xs text-axi-text-muted font-bold uppercase tracking-wider mb-2 block">Email</label>
-                    <div className="relative">
-                      <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-axi-text-muted" />
-                      <input type="email" value={form.email} onChange={(e) => updateForm("email", e.target.value)} placeholder="john@example.com" className="w-full pl-11 pr-4 py-3.5 bg-axi-cream border border-axi-border rounded-xl text-sm text-axi-text placeholder:text-axi-text-muted outline-none focus:border-axi-red/50 transition-colors" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-xs text-axi-text-muted font-bold uppercase tracking-wider mb-2 block">Phone</label>
-                    <div className="relative">
-                      <Smartphone size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-axi-text-muted" />
-                      <input type="tel" value={form.phone} onChange={(e) => updateForm("phone", e.target.value)} placeholder="+1 234 567 8900" className="w-full pl-11 pr-4 py-3.5 bg-axi-cream border border-axi-border rounded-xl text-sm text-axi-text placeholder:text-axi-text-muted outline-none focus:border-axi-red/50 transition-colors" />
-                    </div>
-                  </div>
-                  <Dropdown label="Country of Residence" value={form.country} options={COUNTRIES} onSelect={(c: string) => updateForm("country", c)} />
-                </motion.div>
-              )}
-
-              {step === 2 && (
-                <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
-                  <h2 className="text-lg font-bold text-axi-text mb-1">Security</h2>
-                  <p className="text-xs text-axi-text-muted mb-4">Create a strong password for your account</p>
-                  <div>
-                    <label className="text-xs text-axi-text-muted font-bold uppercase tracking-wider mb-2 block">Password</label>
-                    <div className="relative">
-                      <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-axi-text-muted" />
-                      <input type={showPass ? "text" : "password"} value={form.password} onChange={(e) => updateForm("password", e.target.value)} placeholder="Min 8 characters" className="w-full pl-11 pr-12 py-3.5 bg-axi-cream border border-axi-border rounded-xl text-sm text-axi-text placeholder:text-axi-text-muted outline-none focus:border-axi-red/50 transition-colors" />
-                      <button onClick={() => setShowPass(!showPass)} className="absolute right-4 top-1/2 -translate-y-1/2 text-axi-text-muted hover:text-axi-text transition-colors">{showPass ? <EyeOff size={16} /> : <Eye size={16} />}</button>
-                    </div>
-                    <div className="flex gap-1 mt-2">
-                      {[1, 2, 3, 4].map((i) => (
-                        <div key={i} className={`flex-1 h-1 rounded-full ${form.password.length >= i * 2 ? "bg-axi-success" : "bg-axi-border"}`} />
-                      ))}
-                    </div>
-                    <p className="text-[10px] text-axi-text-muted mt-1">Use at least 8 characters with numbers and symbols</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-axi-text-muted font-bold uppercase tracking-wider mb-2 block">Confirm Password</label>
-                    <div className="relative">
-                      <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-axi-text-muted" />
-                      <input type={showConfirm ? "text" : "password"} value={form.confirmPassword} onChange={(e) => updateForm("confirmPassword", e.target.value)} placeholder="Repeat password" className="w-full pl-11 pr-12 py-3.5 bg-axi-cream border border-axi-border rounded-xl text-sm text-axi-text placeholder:text-axi-text-muted outline-none focus:border-axi-red/50 transition-colors" />
-                      <button onClick={() => setShowConfirm(!showConfirm)} className="absolute right-4 top-1/2 -translate-y-1/2 text-axi-text-muted hover:text-axi-text transition-colors">{showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}</button>
-                    </div>
-                    {form.confirmPassword && form.password !== form.confirmPassword && (
-                      <p className="text-[10px] text-axi-red mt-1">Passwords do not match</p>
-                    )}
-                  </div>
-                  <Dropdown label="Preferred Language" value={selectedLanguage?.label || "English"} options={LANGUAGES} onSelect={(l: any) => updateForm("language", l.code)} renderOption={(l: any) => <span>{l.label}</span>} />
-                </motion.div>
-              )}
-
-              {step === 3 && (
-                <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
-                  <h2 className="text-lg font-bold text-axi-text mb-1">Trading Preferences</h2>
-                  <p className="text-xs text-axi-text-muted mb-4">Choose your account type and currency</p>
-                  <Dropdown label="Account Currency" value={`${selectedCurrency?.flag} ${selectedCurrency?.label} (${selectedCurrency?.code})`} options={CURRENCIES} onSelect={(c: any) => updateForm("currency", c.code)} renderOption={(c: any) => <span>{c.flag} {c.label} ({c.code})</span>} />
-                  <div>
-                    <label className="text-xs text-axi-text-muted font-bold uppercase tracking-wider mb-2 block">Account Type</label>
-                    <div className="space-y-2">
-                      {ACCOUNT_TYPES.map((a) => (
-                        <button key={a.id} onClick={() => updateForm("accountType", a.id)} className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all ${form.accountType === a.id ? "bg-axi-red/10 border border-axi-red" : "bg-axi-cream border border-axi-border hover:border-axi-gold/30"}`}>
-                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${form.accountType === a.id ? "border-axi-red" : "border-axi-border"}`}>
-                            {form.accountType === a.id && <div className="w-2.5 h-2.5 rounded-full bg-axi-red" />}
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-bold text-axi-text">{a.label}</p>
-                            <p className="text-[10px] text-axi-text-muted">{a.description} · Min deposit: ${a.minDeposit}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-[10px] text-axi-text-muted">Spread</p>
-                            <p className="text-xs font-bold text-axi-gold">{a.spread}</p>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-xs text-axi-text-muted font-bold uppercase tracking-wider mb-2 block">Trading Platform</label>
-                    <div className="space-y-2">
-                      {PLATFORMS.map((p) => (
-                        <button key={p.id} onClick={() => updateForm("platform", p.id)} className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all ${form.platform === p.id ? "bg-axi-red/10 border border-axi-red" : "bg-axi-cream border border-axi-border hover:border-axi-gold/30"}`}>
-                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${form.platform === p.id ? "border-axi-red" : "border-axi-border"}`}>
-                            {form.platform === p.id && <div className="w-2.5 h-2.5 rounded-full bg-axi-red" />}
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-bold text-axi-text">{p.label}</p>
-                            <p className="text-[10px] text-axi-text-muted">{p.description}</p>
-                          </div>
-                          <Monitor size={16} className="text-axi-text-muted" />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {step === 4 && (
-                <motion.div key="step4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
-                  <h2 className="text-lg font-bold text-axi-text mb-1">Review & Confirm</h2>
-                  <p className="text-xs text-axi-text-muted mb-4">Verify your information before creating your account</p>
-                  <div className="p-4 bg-axi-cream rounded-xl space-y-3">
-                    <div className="flex justify-between text-sm"><span className="text-axi-text-muted">Name</span><span className="text-axi-text font-bold">{form.firstName} {form.lastName}</span></div>
-                    <div className="flex justify-between text-sm"><span className="text-axi-text-muted">Email</span><span className="text-axi-text font-bold">{form.email}</span></div>
-                    <div className="flex justify-between text-sm"><span className="text-axi-text-muted">Country</span><span className="text-axi-text font-bold">{form.country}</span></div>
-                    <div className="flex justify-between text-sm"><span className="text-axi-text-muted">Currency</span><span className="text-axi-text font-bold">{selectedCurrency?.code}</span></div>
-                    <div className="flex justify-between text-sm"><span className="text-axi-text-muted">Account</span><span className="text-axi-text font-bold">{selectedAccount?.label}</span></div>
-                    <div className="flex justify-between text-sm"><span className="text-axi-text-muted">Platform</span><span className="text-axi-text font-bold">{selectedPlatform?.label}</span></div>
-                  </div>
-                  <div className="space-y-3">
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <input type="checkbox" checked={form.agreeTerms} onChange={(e) => updateForm("agreeTerms", e.target.checked)} className="mt-0.5 w-4 h-4 rounded border-axi-border bg-axi-cream accent-axi-red" />
-                      <span className="text-xs text-axi-text-muted leading-relaxed">I agree to the <Link href="/helpcenter/" className="text-axi-red hover:underline">Terms of Service</Link> and <Link href="/helpcenter/" className="text-axi-red hover:underline">Privacy Policy</Link></span>
-                    </label>
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <input type="checkbox" checked={form.agreeRisk} onChange={(e) => updateForm("agreeRisk", e.target.checked)} className="mt-0.5 w-4 h-4 rounded border-axi-border bg-axi-cream accent-axi-red" />
-                      <span className="text-xs text-axi-text-muted leading-relaxed">I understand that trading involves risk and may result in loss of capital. <strong>55.1% of retail clients lose money.</strong></span>
-                    </label>
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <input type="checkbox" checked={form.agreeMarketing} onChange={(e) => updateForm("agreeMarketing", e.target.checked)} className="mt-0.5 w-4 h-4 rounded border-axi-border bg-axi-cream accent-axi-red" />
-                      <span className="text-xs text-axi-text-muted leading-relaxed">I agree to receive marketing communications (optional)</span>
-                    </label>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <div className="flex gap-3 pt-2">
-              {step > 1 && (
-                <motion.button whileTap={{ scale: 0.97 }} onClick={handleBack} className="flex-1 py-3.5 rounded-xl border border-axi-border text-axi-text font-bold text-sm hover:bg-axi-cream transition-colors">Back</motion.button>
-              )}
-              {step < totalSteps ? (
-                <motion.button whileTap={{ scale: 0.97 }} onClick={handleNext} className="flex-1 py-3.5 rounded-xl bg-axi-gold text-axi-black font-bold text-sm hover:bg-axi-gold-hover transition-colors flex items-center justify-center gap-2">
-                  Continue <ArrowRight size={16} />
-                </motion.button>
-              ) : (
-                <motion.button whileTap={{ scale: 0.97 }} onClick={handleSubmit} disabled={isLoading || !form.agreeTerms || !form.agreeRisk} className="flex-1 py-3.5 rounded-xl bg-axi-gold text-axi-black font-bold text-sm hover:bg-axi-gold-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-                  {isLoading ? <div className="w-4 h-4 border-2 border-axi-black border-t-transparent rounded-full animate-spin" /> : <><Check size={16} /> Create Account</>}
-                </motion.button>
-              )}
-            </div>
-          </div>
-
-          <p className="text-center text-axi-text-muted text-xs mt-6">
-            Already have an account? <Link href="/login/" className="text-axi-red font-bold hover:underline">Sign In</Link>
-          </p>
-        </motion.div>
-      </div>
-
-      <div className="px-4 py-4 bg-white border-t border-axi-border">
-        <div className="flex items-center justify-center gap-6 text-axi-text-muted text-[10px]">
-          <span className="flex items-center gap-1"><Shield size={10} /> SSL Secured</span>
-          <span className="flex items-center gap-1"><Award size={10} /> Regulated</span>
-          <span className="flex items-center gap-1"><Monitor size={10} /> 200+ Instruments</span>
-        </div>
-      </div>
-
-      <LiveChatBot />
+      </motion.div>
     </div>
   );
 }
