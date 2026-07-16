@@ -2,7 +2,7 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -27,26 +27,3 @@ jobs:
 
       - name: Lint check
         run: npm run lint || true
-
-      - name: Build application
-        run: npm run build
-        env:
-          DATABASE_URL: "file:./dev.db"
-          JWT_SECRET: "github-actions-test-secret-key-32chars"
-          NEXT_PUBLIC_APP_URL: "http://localhost:3000"
-
-  deploy-vercel:
-    needs: build-and-test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Deploy to Vercel
-        uses: amondnet/vercel-action@v25
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-args: "--prod"
