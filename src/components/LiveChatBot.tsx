@@ -41,7 +41,8 @@ const botResponses: Record<string, string[]> = {
   ],
 };
 
-function getBotResponse(userMsg: string): string {
+function getFallbackResponse(userMsg: string): string {
+  // Used only if the live AI call fails (network/API issue) so the widget never goes silent
   const lower = userMsg.toLowerCase();
   if (lower.includes("deposit") || lower.includes("fund") || lower.includes("add money")) return botResponses.deposit[Math.floor(Math.random() * botResponses.deposit.length)];
   if (lower.includes("withdraw") || lower.includes("payout") || lower.includes("take out")) return botResponses.withdraw[Math.floor(Math.random() * botResponses.withdraw.length)];
@@ -50,6 +51,22 @@ function getBotResponse(userMsg: string): string {
   if (lower.includes("platform") || lower.includes("mt4") || lower.includes("mt5") || lower.includes("app")) return botResponses.platform[Math.floor(Math.random() * botResponses.platform.length)];
   if (lower.includes("support") || lower.includes("help") || lower.includes("contact") || lower.includes("agent")) return botResponses.support[Math.floor(Math.random() * botResponses.support.length)];
   return botResponses.default[Math.floor(Math.random() * botResponses.default.length)];
+}
+
+async function getBotResponse(userMsg: string): Promise<string> {
+  try {
+    const res = await fetch("/api/assistant", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ message: userMsg }),
+    });
+    if (!res.ok) return getFallbackResponse(userMsg);
+    const data = await res.json();
+    return data.reply || getFallbackResponse(userMsg);
+  } catch {
+    return getFallbackResponse(userMsg);
+  }
 }
 
 const quickReplies = [
@@ -74,28 +91,27 @@ export default function LiveChatBot() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim()) return;
-    const userMsg: ChatMessage = { id: Date.now().toString(), sender: "user", text: input, timestamp: new Date() };
+    const userText = input;
+    const userMsg: ChatMessage = { id: Date.now().toString(), sender: "user", text: userText, timestamp: new Date() };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setIsTyping(true);
-    setTimeout(() => {
-      const botMsg: ChatMessage = { id: (Date.now() + 1).toString(), sender: "bot", text: getBotResponse(input), timestamp: new Date() };
-      setMessages((prev) => [...prev, botMsg]);
-      setIsTyping(false);
-    }, 1500);
+    const replyText = await getBotResponse(userText);
+    const botMsg: ChatMessage = { id: (Date.now() + 1).toString(), sender: "bot", text: replyText, timestamp: new Date() };
+    setMessages((prev) => [...prev, botMsg]);
+    setIsTyping(false);
   };
 
-  const handleQuickReply = (text: string) => {
+  const handleQuickReply = async (text: string) => {
     const userMsg: ChatMessage = { id: Date.now().toString(), sender: "user", text, timestamp: new Date() };
     setMessages((prev) => [...prev, userMsg]);
     setIsTyping(true);
-    setTimeout(() => {
-      const botMsg: ChatMessage = { id: (Date.now() + 1).toString(), sender: "bot", text: getBotResponse(text), timestamp: new Date() };
-      setMessages((prev) => [...prev, botMsg]);
-      setIsTyping(false);
-    }, 1200);
+    const replyText = await getBotResponse(text);
+    const botMsg: ChatMessage = { id: (Date.now() + 1).toString(), sender: "bot", text: replyText, timestamp: new Date() };
+    setMessages((prev) => [...prev, botMsg]);
+    setIsTyping(false);
   };
 
   return (
