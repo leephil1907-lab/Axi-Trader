@@ -2,8 +2,15 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { prisma } from "./prisma";
 
-const JWT_SECRET = process.env.JWT_SECRET || "axi-trader-default-secret-min-32-chars-long";
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
+
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error("JWT_SECRET must be configured with at least 32 characters");
+  }
+  return secret;
+}
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 12);
@@ -14,12 +21,13 @@ export async function verifyPassword(password: string, hashedPassword: string): 
 }
 
 export function generateToken(userId: string, role: string): string {
-  return jwt.sign({ userId, role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  return jwt.sign({ userId, role }, getJwtSecret(), { expiresIn: JWT_EXPIRES_IN });
 }
 
 export function verifyToken(token: string): { userId: string; role: string } | null {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; role: string };
+    const decoded = jwt.verify(token, getJwtSecret()) as { userId: string; role: string };
+    if (!decoded.userId || !decoded.role) return null;
     return decoded;
   } catch {
     return null;
@@ -40,6 +48,9 @@ export async function getUserFromToken(token: string) {
       createdAt: true,
     },
   });
+
+  if (!user || user.status !== "active") return null;
+  if (user.role !== decoded.role) return null;
 
   return user;
 }
