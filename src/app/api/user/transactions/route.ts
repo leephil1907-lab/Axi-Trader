@@ -3,7 +3,7 @@ import { verifyToken } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 function auth(req: NextRequest) {
-  const token = req.headers.get("authorization")?.replace("Bearer ", "");
+  const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   return token ? verifyToken(token) : null;
 }
 
@@ -14,9 +14,19 @@ export async function POST(req: NextRequest) {
     const { type, amount, currency, method, promoCode } = await req.json();
     const numericAmount = Number(amount);
     const normalizedCurrency = String(currency || "").trim().toUpperCase();
+    const normalizedMethod = String(method || "").trim().toLowerCase();
     if (!["deposit", "withdrawal"].includes(type)) return NextResponse.json({ error: "Invalid transaction type" }, { status: 400 });
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) return NextResponse.json({ error: "Amount must be greater than zero" }, { status: 400 });
-    if (!normalizedCurrency || !method) return NextResponse.json({ error: "Currency and method are required" }, { status: 400 });
+    if (!normalizedCurrency || !normalizedMethod) return NextResponse.json({ error: "Currency and method are required" }, { status: 400 });
+
+    let paymentDetails: string | undefined;
+    if (type === "deposit") {
+      const fundingMethod = await prisma.fundingMethod.findFirst({ where: { key: normalizedMethod, enabled: true } });
+      if (!fundingMethod) return NextResponse.json({ error: "This funding method is currently unavailable" }, { status: 409 });
+      if (fundingMethod.minAmount !== null && numericAmount < fundingMethod.minAmount) return NextResponse.json({ error: `Minimum amount is ${fundingMethod.minAmount} ${normalizedCurrency}` }, { status: 400 });
+      if (fundingMethod.maxAmount !== null && numericAmount > fundingMethod.maxAmount) return NextResponse.json({ error: `Maximum amount is ${fundingMethod.maxAmount} ${normalizedCurrency}` }, { status: 400 });
+      paymentDetails = JSON.stringify({ fundingMethodId: fundingMethod.id, name: fundingMethod.name, type: fundingMethod.type, asset: fundingMethod.asset, network: fundingMethod.network, walletAddress: fundingMethod.walletAddress, bankName: fundingMethod.bankName, bankAccountName: fundingMethod.bankAccountName, bankAccount: fundingMethod.bankAccount, bankRouting: fundingMethod.bankRouting, bankSwift: fundingMethod.bankSwift, instructions: fundingMethod.instructions });
+    }
 
     let promotionEnrollmentId: string | undefined;
     if (type === "deposit" && promoCode) {
@@ -39,9 +49,7 @@ export async function POST(req: NextRequest) {
       promotionEnrollmentId = enrollment.id;
     }
 
-    const tx = await prisma.transaction.create({
-      data: { userId: decoded.userId, type, amount: numericAmount, currency: normalizedCurrency, method, status: "pending", promotionEnrollmentId },
-    });
+    const tx = await prisma.transaction.create({ data: { userId: decoded.userId, type, amount: numericAmount, currency: normalizedCurrency, method: normalizedMethod, status: "pending", promotionEnrollmentId, paymentDetails } });
     return NextResponse.json({ transaction: tx }, { status: 201 });
   } catch (error) {
     console.error("User transaction create error", error);
