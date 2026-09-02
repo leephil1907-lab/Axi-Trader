@@ -15,7 +15,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const [form, setForm] = useState({
     firstName: "", lastName: "", email: "", phone: "",
-    country: "US", password: "", confirmPassword: "",
+    country: "United States", password: "", confirmPassword: "",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -34,8 +34,8 @@ export default function RegisterPage() {
       setError("Passwords do not match");
       return;
     }
-    if (form.password.length < 6) {
-      setError("Password must be at least 6 characters");
+    if (form.password.length < 8) {
+      setError("Password must be at least 8 characters");
       return;
     }
 
@@ -65,7 +65,7 @@ export default function RegisterPage() {
       setClientUser(data.user);
       setSuccess(true);
       setTimeout(() => router.push("/dashboard/"), 800);
-    } catch (err: any) {
+    } catch {
       setError("Network error. Please try again.");
       setLoading(false);
     }
@@ -157,8 +157,8 @@ export default function RegisterPage() {
                   onChange={(e) => updateField("country", e.target.value)}
                   className="w-full pl-10 pr-3 py-2.5 rounded-lg border border-[#D9D3CB] text-sm focus:outline-none focus:ring-2 focus:ring-[#D31C2B]/20 focus:border-[#D31C2B] bg-white"
                 >
-                  {COUNTRIES.map((c) => (
-                    <option key={c.code} value={c.code}>{c.name}</option>
+                  {COUNTRIES.map((country) => (
+                    <option key={country} value={country}>{country}</option>
                   ))}
                 </select>
               </div>
@@ -174,7 +174,7 @@ export default function RegisterPage() {
                 value={form.password}
                 onChange={(e) => updateField("password", e.target.value)}
                 className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-[#D9D3CB] text-sm focus:outline-none focus:ring-2 focus:ring-[#D31C2B]/20 focus:border-[#D31C2B]"
-                placeholder="Min 6 characters"
+                placeholder="Min 8 characters"
               />
               <button type="button" onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9B9590]">
