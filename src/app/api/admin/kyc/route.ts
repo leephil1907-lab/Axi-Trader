@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { sendKycDecisionEmail } from "@/lib/email";
 
 function admin(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
@@ -32,5 +33,7 @@ export async function PATCH(req: NextRequest) {
 
   const userStatus = status === "approved" ? "verified" : status === "rejected" ? "rejected" : "pending";
   await prisma.user.update({ where: { id: document.userId }, data: { kycStatus: userStatus } });
+  const user = await prisma.user.findUnique({ where: { id: document.userId }, select: { email: true, firstName: true } });
+  if (user) void sendKycDecisionEmail(user, status, rejectionReason);
   return NextResponse.json({ document, kycStatus: userStatus });
 }
