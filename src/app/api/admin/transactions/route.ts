@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { completeTransaction } from "@/lib/complete-transaction";
+import type { Prisma } from "@prisma/client";
 
 function getAdmin(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
@@ -24,7 +25,7 @@ export async function PATCH(req: NextRequest) {
     const { id, status, rejectionReason } = await req.json();
     if (!id || !["completed", "rejected", "pending"].includes(status)) return NextResponse.json({ error: "Invalid id or status" }, { status: 400 });
     if (status === "completed") return NextResponse.json({ transaction: await completeTransaction(String(id), admin.userId) });
-    const result = await prisma.$transaction(async tx => {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const transaction = await tx.transaction.findUnique({ where: { id: String(id) } });
       if (!transaction) throw new Error("TRANSACTION_NOT_FOUND");
       if (transaction.status !== "pending") throw new Error("TRANSACTION_ALREADY_REVIEWED");
