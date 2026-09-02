@@ -9,6 +9,8 @@ function getUser(req: NextRequest) {
 
 const split = (value?: string | null) => (value || "").split(",").map(v => v.trim().toUpperCase()).filter(Boolean);
 
+type FundingMethodRecord = Awaited<ReturnType<typeof prisma.fundingMethod.findMany>>[number];
+
 export async function GET(req: NextRequest) {
   try {
     const decoded = getUser(req);
@@ -18,12 +20,12 @@ export async function GET(req: NextRequest) {
     const country = (user.country || "US").trim().toUpperCase();
     const currency = (user.currency || "USD").trim().toUpperCase();
     const methods = await prisma.fundingMethod.findMany({ where: { enabled: true }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] });
-    const available = methods.filter((m: (typeof methods)[number]) => {
+    const available = methods.filter((m: FundingMethodRecord) => {
       const countries = split(m.countries);
       const currencies = split(m.currencies);
       const global = countries.includes("*") || countries.includes("ALL");
       return (global || !countries.length || countries.includes(country)) && (!currencies.length || currencies.includes("*") || currencies.includes("ALL") || currencies.includes(currency));
-    }).map(m => ({ id: m.id, key: m.key, name: m.name, type: m.type, minAmount: m.minAmount, maxAmount: m.maxAmount, instructions: m.instructions, asset: m.asset, network: m.network, walletAddress: m.walletAddress, bankName: m.bankName, bankAccountName: m.bankAccountName, bankAccount: m.bankAccount, bankRouting: m.bankRouting, bankSwift: m.bankSwift, stripeEnabled: m.stripeEnabled, stripePublicKey: m.stripePublicKey, logoUrl: m.logoUrl }));
+    }).map((m: FundingMethodRecord) => ({ id: m.id, key: m.key, name: m.name, type: m.type, minAmount: m.minAmount, maxAmount: m.maxAmount, instructions: m.instructions, asset: m.asset, network: m.network, walletAddress: m.walletAddress, bankName: m.bankName, bankAccountName: m.bankAccountName, bankAccount: m.bankAccount, bankRouting: m.bankRouting, bankSwift: m.bankSwift, stripeEnabled: m.stripeEnabled, stripePublicKey: m.stripePublicKey, logoUrl: m.logoUrl }));
     return NextResponse.json({ country, currency, methods: available });
   } catch (error) {
     console.error("Funding methods error", error);
