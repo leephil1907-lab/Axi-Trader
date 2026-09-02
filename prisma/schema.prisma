@@ -50,7 +50,7 @@ model Transaction {
   currency              String
   method                String
   paymentReference      String?
-  paymentDetails       String?
+  paymentDetails        String?
   status                String                 @default("pending")
   promotionEnrollmentId String?
   promotionEnrollment   PromotionEnrollment?  @relation(fields: [promotionEnrollmentId], references: [id])
@@ -179,6 +179,7 @@ model FundingMethod {
   bankSwift       String?
   stripeEnabled   Boolean  @default(false)
   stripePublicKey String?
+  logoUrl         String?
   sortOrder       Int      @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
