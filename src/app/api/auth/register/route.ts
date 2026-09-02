@@ -50,11 +50,18 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Account creation must succeed even if the optional email provider is temporarily unavailable.
-    await sendWelcomeEmail({ email: user.email, firstName: user.firstName });
+    // The PostgreSQL user record is created before any optional email delivery.
+    // Email delivery must never block account creation or admin visibility.
+    try {
+      await sendWelcomeEmail({ email: user.email, firstName: user.firstName });
+    } catch (emailError) {
+      console.error("Welcome email delivery failed:", emailError);
+    }
 
+    // Issue the same server-authenticated cookie used by login so the newly
+    // registered user can enter the dashboard immediately without Firebase.
     const token = generateToken(user.id, user.role);
-    return NextResponse.json({
+    const response = NextResponse.json({
       token,
       user: {
         id: user.id, email: user.email, name: user.name,
@@ -63,6 +70,16 @@ export async function POST(req: NextRequest) {
         currency: user.currency, country: user.country,
       }
     });
+
+    response.cookies.set("axi_token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7,
+      path: "/",
+    });
+
+    return response;
   } catch (err: any) {
     console.error("Register error:", err);
     return NextResponse.json({ error: "Registration failed", detail: err.message }, { status: 500 });
