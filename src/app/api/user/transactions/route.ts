@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import Stripe from "stripe";
 import { verifyToken } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -20,8 +21,9 @@ export async function POST(req: NextRequest) {
     if (!normalizedCurrency || !normalizedMethod) return NextResponse.json({ error: "Currency and method are required" }, { status: 400 });
 
     let paymentDetails: string | undefined;
+    let fundingMethod: any = null;
     if (type === "deposit") {
-      const fundingMethod = await prisma.fundingMethod.findFirst({ where: { key: normalizedMethod, enabled: true } });
+      fundingMethod = await prisma.fundingMethod.findFirst({ where: { key: normalizedMethod, enabled: true } });
       if (!fundingMethod) return NextResponse.json({ error: "This funding method is currently unavailable" }, { status: 409 });
       if (fundingMethod.minAmount !== null && numericAmount < fundingMethod.minAmount) return NextResponse.json({ error: `Minimum amount is ${fundingMethod.minAmount} ${normalizedCurrency}` }, { status: 400 });
       if (fundingMethod.maxAmount !== null && numericAmount > fundingMethod.maxAmount) return NextResponse.json({ error: `Maximum amount is ${fundingMethod.maxAmount} ${normalizedCurrency}` }, { status: 400 });
@@ -50,11 +52,23 @@ export async function POST(req: NextRequest) {
     }
 
     const tx = await prisma.transaction.create({ data: { userId: decoded.userId, type, amount: numericAmount, currency: normalizedCurrency, method: normalizedMethod, status: "pending", promotionEnrollmentId, paymentDetails } });
+
+    if (type === "deposit" && fundingMethod?.type === "card" && fundingMethod.stripeEnabled) {
+      if (!process.env.STRIPE_SECRET_KEY) return NextResponse.json({ error: "Stripe is not configured" }, { status: 503 });
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+      const origin = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin;
+      try {
+        const session = await stripe.checkout.sessions.create({ mode:"payment", payment_method_types:["card"], line_items:[{price_data:{currency:normalizedCurrency.toLowerCase(),product_data:{name:"AxiTrades account funding"},unit_amount:Math.round(numericAmount*100)},quantity:1}], metadata:{transactionId:tx.id,userId:decoded.userId}, success_url:`${origin}/deposit/?payment=success`, cancel_url:`${origin}/deposit/?payment=cancelled` });
+        await prisma.transaction.update({ where:{id:tx.id}, data:{paymentReference:session.id} });
+        return NextResponse.json({ transaction:{...tx,paymentReference:session.id}, url:session.url }, { status:201 });
+      } catch (stripeError) {
+        await prisma.transaction.update({ where:{id:tx.id}, data:{status:"rejected",rejectionReason:"Unable to initialize Stripe checkout"} });
+        console.error("Stripe checkout initialization error", stripeError);
+        return NextResponse.json({ error:"Unable to start card payment" }, { status:502 });
+      }
+    }
     return NextResponse.json({ transaction: tx }, { status: 201 });
-  } catch (error) {
-    console.error("User transaction create error", error);
-    return NextResponse.json({ error: "Failed to create transaction" }, { status: 500 });
-  }
+  } catch (error) { console.error("User transaction create error", error); return NextResponse.json({ error: "Failed to create transaction" }, { status: 500 }); }
 }
 
 export async function GET(req: NextRequest) {
@@ -63,8 +77,5 @@ export async function GET(req: NextRequest) {
     if (!decoded) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const transactions = await prisma.transaction.findMany({ where: { userId: decoded.userId }, orderBy: { createdAt: "desc" } });
     return NextResponse.json({ transactions });
-  } catch (error) {
-    console.error("User transaction list error", error);
-    return NextResponse.json({ error: "Failed to fetch transactions" }, { status: 500 });
-  }
+  } catch (error) { console.error("User transaction list error", error); return NextResponse.json({ error: "Failed to fetch transactions" }, { status: 500 }); }
 }
