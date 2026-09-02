@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendKycDecisionEmail } from "@/lib/email";
 import { requireAdmin, requestAuditContext } from "@/lib/admin-auth";
@@ -28,7 +29,7 @@ export async function PATCH(req: NextRequest) {
   if (!id || !["approved", "rejected", "pending"].includes(status)) return NextResponse.json({ error: "Invalid id or status" }, { status: 400 });
 
   try {
-    const result = await prisma.$transaction(async tx => {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const document = await tx.kycDocument.findUnique({ where: { id } });
       if (!document) throw new Error("KYC_NOT_FOUND");
       const userStatus = status === "approved" ? "verified" : status === "rejected" ? "rejected" : "pending";
