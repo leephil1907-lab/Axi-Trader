@@ -39,6 +39,7 @@ model User {
   kycDocs      KycDocument[]
   promotions   PromotionEnrollment[]
   bonusLedger  BonusLedger[]
+  auditLogs    AuditLog[]
 }
 
 model Transaction {
@@ -109,8 +110,8 @@ model Promotion {
   active               Boolean  @default(false)
   startsAt             DateTime
   endsAt               DateTime?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   enrollments PromotionEnrollment[]
   bonusLedger BonusLedger[]
@@ -185,4 +186,33 @@ model FundingMethod {
   updatedAt       DateTime @updatedAt
 
   @@index([enabled, sortOrder])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorUserId String?
+  actor      User?    @relation(fields: [actorUserId], references: [id])
+  action     String
+  resource   String
+  resourceId String?
+  outcome    String   @default("success")
+  ipAddress  String?
+  userAgent  String?
+  requestId  String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
+  @@index([resource, resourceId])
+  @@index([requestId])
+}
+
+model RateLimitBucket {
+  key         String   @id
+  windowStart DateTime
+  count       Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  @@index([updatedAt])
 }
