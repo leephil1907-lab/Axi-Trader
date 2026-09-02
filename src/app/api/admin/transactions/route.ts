@@ -2,51 +2,79 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+function getAdmin(req: NextRequest) {
+  const token = req.headers.get("authorization")?.replace("Bearer ", "");
+  const decoded = token ? verifyToken(token) : null;
+  return decoded?.role === "admin" ? decoded : null;
+}
+
 export async function GET(req: NextRequest) {
   try {
-    const token = req.headers.get("authorization")?.replace("Bearer ", "");
-    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const decoded = verifyToken(token);
-    if (!decoded || decoded.role !== "admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
+    if (!getAdmin(req)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     const transactions = await prisma.transaction.findMany({
-      include: { user: { select: { id: true, name: true, email: true } } },
+      include: { user: { select: { id: true, name: true, email: true, currency: true } } },
       orderBy: { createdAt: "desc" },
     });
-
     return NextResponse.json({ transactions });
-  } catch (err: any) {
-    console.error("Admin tx error:", err);
+  } catch (error) {
+    console.error("Admin transaction list error", error);
     return NextResponse.json({ error: "Failed to fetch transactions" }, { status: 500 });
   }
 }
 
 export async function PATCH(req: NextRequest) {
   try {
-    const token = req.headers.get("authorization")?.replace("Bearer ", "");
-    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const decoded = verifyToken(token);
-    if (!decoded || decoded.role !== "admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const admin = getAdmin(req);
+    if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const { id, status, rejectionReason } = await req.json();
-    if (!id || !status) {
-      return NextResponse.json({ error: "Missing id or status" }, { status: 400 });
+    if (!id || !["completed", "rejected", "pending"].includes(status)) {
+      return NextResponse.json({ error: "Invalid id or status" }, { status: 400 });
     }
 
-    const tx = await prisma.transaction.update({
-      where: { id },
-      data: { status, rejectionReason, reviewedAt: new Date(), reviewedBy: decoded.userId },
+    const result = await prisma.$transaction(async (tx) => {
+      const transaction = await tx.transaction.findUnique({ where: { id } });
+      if (!transaction) throw new Error("TRANSACTION_NOT_FOUND");
+      if (transaction.status !== "pending") throw new Error("TRANSACTION_ALREADY_REVIEWED");
+
+      if (status === "completed") {
+        const user = await tx.user.findUnique({ where: { id: transaction.userId } });
+        if (!user) throw new Error("USER_NOT_FOUND");
+
+        const amount = Number(transaction.amount);
+        if (!Number.isFinite(amount) || amount <= 0) throw new Error("INVALID_AMOUNT");
+
+        if (transaction.type === "withdrawal" && user.balance < amount) {
+          throw new Error("INSUFFICIENT_BALANCE");
+        }
+
+        const nextBalance = transaction.type === "deposit" ? user.balance + amount : user.balance - amount;
+        await tx.user.update({
+          where: { id: user.id },
+          data: {
+            balance: nextBalance,
+            equity: nextBalance,
+            freeMargin: nextBalance,
+          },
+        });
+      }
+
+      return tx.transaction.update({
+        where: { id },
+        data: {
+          status,
+          rejectionReason: status === "rejected" ? rejectionReason || "Rejected by admin" : null,
+          reviewedAt: new Date(),
+          reviewedBy: admin.userId,
+        },
+      });
     });
 
-    return NextResponse.json({ transaction: tx });
-  } catch (err: any) {
-    console.error("Admin tx patch error:", err);
-    return NextResponse.json({ error: "Failed to update transaction" }, { status: 500 });
+    return NextResponse.json({ transaction: result });
+  } catch (error: any) {
+    const message = error?.message;
+    const status = message === "TRANSACTION_NOT_FOUND" ? 404 : message === "TRANSACTION_ALREADY_REVIEWED" || message === "INSUFFICIENT_BALANCE" ? 409 : 500;
+    console.error("Admin transaction update error", error);
+    return NextResponse.json({ error: message || "Failed to update transaction" }, { status });
   }
 }
