@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { verifyToken } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { sendTransactionEmail } from "@/lib/email";
 
 function auth(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
@@ -52,6 +53,8 @@ export async function POST(req: NextRequest) {
     }
 
     const tx = await prisma.transaction.create({ data: { userId: decoded.userId, type, amount: numericAmount, currency: normalizedCurrency, method: normalizedMethod, status: "pending", promotionEnrollmentId, paymentDetails } });
+    const accountUser = await prisma.user.findUnique({ where: { id: decoded.userId }, select: { email: true, firstName: true } });
+    if (accountUser) void sendTransactionEmail(accountUser, type, "pending", numericAmount.toFixed(2), normalizedCurrency);
 
     if (type === "deposit" && fundingMethod?.type === "card" && fundingMethod.stripeEnabled) {
       if (!process.env.STRIPE_SECRET_KEY) return NextResponse.json({ error: "Stripe is not configured" }, { status: 503 });
@@ -63,6 +66,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ transaction:{...tx,paymentReference:session.id}, url:session.url }, { status:201 });
       } catch (stripeError) {
         await prisma.transaction.update({ where:{id:tx.id}, data:{status:"rejected",rejectionReason:"Unable to initialize Stripe checkout"} });
+        if (accountUser) void sendTransactionEmail(accountUser, "deposit", "rejected", numericAmount.toFixed(2), normalizedCurrency, "Unable to initialize the card payment session.");
         console.error("Stripe checkout initialization error", stripeError);
         return NextResponse.json({ error:"Unable to start card payment" }, { status:502 });
       }
