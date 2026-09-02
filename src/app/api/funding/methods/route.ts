@@ -18,12 +18,12 @@ export async function GET(req: NextRequest) {
     const country = (user.country || "US").trim().toUpperCase();
     const currency = (user.currency || "USD").trim().toUpperCase();
     const methods = await prisma.fundingMethod.findMany({ where: { enabled: true }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] });
-    const available = methods.filter(m => {
+    const available = methods.filter((m: (typeof methods)[number]) => {
       const countries = split(m.countries);
       const currencies = split(m.currencies);
       const global = countries.includes("*") || countries.includes("ALL");
       return (global || !countries.length || countries.includes(country)) && (!currencies.length || currencies.includes("*") || currencies.includes("ALL") || currencies.includes(currency));
-    }).map(m => ({ id: m.id, key: m.key, name: m.name, type: m.type, minAmount: m.minAmount, maxAmount: m.maxAmount, instructions: m.instructions, asset: m.asset, network: m.network, walletAddress: m.walletAddress, bankName: m.bankName, bankAccountName: m.bankAccountName, bankAccount: m.bankAccount, bankRouting: m.bankRouting, bankSwift: m.bankSwift, stripeEnabled: m.stripeEnabled, stripePublicKey: m.stripePublicKey, logoUrl: m.logoUrl }))
+    }).map(m => ({ id: m.id, key: m.key, name: m.name, type: m.type, minAmount: m.minAmount, maxAmount: m.maxAmount, instructions: m.instructions, asset: m.asset, network: m.network, walletAddress: m.walletAddress, bankName: m.bankName, bankAccountName: m.bankAccountName, bankAccount: m.bankAccount, bankRouting: m.bankRouting, bankSwift: m.bankSwift, stripeEnabled: m.stripeEnabled, stripePublicKey: m.stripePublicKey, logoUrl: m.logoUrl }));
     return NextResponse.json({ country, currency, methods: available });
   } catch (error) {
     console.error("Funding methods error", error);
