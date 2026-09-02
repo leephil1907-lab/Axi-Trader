@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { sendKycSubmittedEmail } from "@/lib/email";
 
 function auth(req: NextRequest) {
-  const token = req.headers.get("authorization")?.replace("Bearer ", "");
+  const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   return token ? verifyToken(token) : null;
 }
 
@@ -25,5 +26,7 @@ export async function POST(req: NextRequest) {
     data: { userId: decoded.userId, type, fileUrl, fileName, status: "pending" },
   });
   await prisma.user.update({ where: { id: decoded.userId }, data: { kycStatus: "pending" } });
+  const user = await prisma.user.findUnique({ where: { id: decoded.userId }, select: { email: true, firstName: true } });
+  if (user) void sendKycSubmittedEmail(user);
   return NextResponse.json({ document, kycStatus: "pending" }, { status: 201 });
 }
