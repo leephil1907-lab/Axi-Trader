@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { calculateBonus } from "@/lib/promotions";
+import { sendTransactionEmail } from "@/lib/email";
 
 export async function completeTransaction(id: string, reviewer = "payment_provider") {
-  return prisma.$transaction(async tx => {
+  const result = await prisma.$transaction(async tx => {
     const transaction = await tx.transaction.findUnique({ where: { id }, include: { promotionEnrollment: { include: { promotion: true } }, bonusLedger: true } });
     if (!transaction) throw new Error("TRANSACTION_NOT_FOUND");
     if (transaction.status !== "pending") return transaction;
@@ -32,4 +33,10 @@ export async function completeTransaction(id: string, reviewer = "payment_provid
     await tx.user.update({ where:{id:user.id}, data:{balance:nextBalance,equity:nextBalance,freeMargin:nextBalance} });
     return tx.transaction.update({where:{id},data:{status:"completed",reviewedAt:new Date(),reviewedBy:reviewer}});
   });
+
+  if (result.status === "completed") {
+    const user = await prisma.user.findUnique({ where: { id: result.userId }, select: { email: true, firstName: true } });
+    if (user) void sendTransactionEmail(user, result.type as "deposit" | "withdrawal", "completed", Number(result.amount).toFixed(2), result.currency);
+  }
+  return result;
 }
