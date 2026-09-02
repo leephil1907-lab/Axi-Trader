@@ -37,21 +37,29 @@ model User {
   transactions Transaction[]
   trades       Trade[]
   kycDocs      KycDocument[]
+  promotions   PromotionEnrollment[]
+  bonusLedger  BonusLedger[]
 }
 
 model Transaction {
-  id              String   @id @default(cuid())
-  userId          String
-  user            User     @relation(fields: [userId], references: [id])
-  type            String
-  amount          Float
-  currency        String
-  method          String
-  status          String   @default("pending")
-  createdAt       DateTime @default(now())
-  reviewedAt      DateTime?
-  reviewedBy      String?
-  rejectionReason String?
+  id                    String                 @id @default(cuid())
+  userId                String
+  user                  User                   @relation(fields: [userId], references: [id])
+  type                  String
+  amount                Float
+  currency              String
+  method                String
+  status                String                 @default("pending")
+  promotionEnrollmentId String?
+  promotionEnrollment   PromotionEnrollment?  @relation(fields: [promotionEnrollmentId], references: [id])
+  createdAt             DateTime               @default(now())
+  reviewedAt            DateTime?
+  reviewedBy            String?
+  rejectionReason       String?
+  bonusLedger           BonusLedger?
+
+  @@index([userId, status])
+  @@index([promotionEnrollmentId])
 }
 
 model Trade {
@@ -81,4 +89,69 @@ model KycDocument {
   reviewedAt      DateTime?
   reviewedBy      String?
   rejectionReason String?
+}
+
+model Promotion {
+  id                   String   @id @default(cuid())
+  code                 String   @unique
+  name                 String
+  description          String
+  bonusPercent         Float    @default(100)
+  minDeposit           Float    @default(0)
+  maxBonus             Float?
+  currency             String   @default("USD")
+  eligibleCountries    String?
+  eligibleAccountTypes String?
+  firstDepositOnly     Boolean  @default(false)
+  requiresTrade        Boolean  @default(false)
+  active               Boolean  @default(false)
+  startsAt             DateTime
+  endsAt               DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  enrollments PromotionEnrollment[]
+  bonusLedger BonusLedger[]
+
+  @@index([active, startsAt, endsAt])
+}
+
+model PromotionEnrollment {
+  id                   String    @id @default(cuid())
+  userId               String
+  promotionId          String
+  status               String    @default("active")
+  activatedAt          DateTime  @default(now())
+  expiresAt            DateTime?
+  qualifyingDepositId  String?
+  completedAt          DateTime?
+  user                 User      @relation(fields: [userId], references: [id])
+  promotion            Promotion @relation(fields: [promotionId], references: [id])
+  transactions         Transaction[]
+  bonusLedger          BonusLedger[]
+
+  @@unique([userId, promotionId])
+  @@index([userId, status])
+  @@index([promotionId, status])
+}
+
+model BonusLedger {
+  id            String                @id @default(cuid())
+  userId        String
+  promotionId   String
+  enrollmentId  String
+  transactionId String?               @unique
+  type          String                @default("credit")
+  status        String                @default("credited")
+  amount        Float
+  currency      String
+  description   String
+  createdAt     DateTime              @default(now())
+  user          User                  @relation(fields: [userId], references: [id])
+  promotion     Promotion             @relation(fields: [promotionId], references: [id])
+  enrollment    PromotionEnrollment  @relation(fields: [enrollmentId], references: [id])
+  transaction   Transaction?          @relation(fields: [transactionId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([promotionId, status])
 }
