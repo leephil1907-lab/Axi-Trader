@@ -49,6 +49,8 @@ model Transaction {
   amount                Float
   currency              String
   method                String
+  paymentReference      String?
+  paymentDetails       String?
   status                String                 @default("pending")
   promotionEnrollmentId String?
   promotionEnrollment   PromotionEnrollment?  @relation(fields: [promotionEnrollmentId], references: [id])
@@ -154,4 +156,32 @@ model BonusLedger {
 
   @@index([userId, createdAt])
   @@index([promotionId, status])
+}
+
+model FundingMethod {
+  id              String   @id @default(cuid())
+  key             String   @unique
+  name            String
+  type            String
+  enabled         Boolean  @default(false)
+  countries       String?
+  currencies      String?
+  minAmount       Float?
+  maxAmount       Float?
+  instructions    String?
+  asset           String?
+  network         String?
+  walletAddress   String?
+  bankName        String?
+  bankAccountName String?
+  bankAccount     String?
+  bankRouting     String?
+  bankSwift       String?
+  stripeEnabled   Boolean  @default(false)
+  stripePublicKey String?
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([enabled, sortOrder])
 }
