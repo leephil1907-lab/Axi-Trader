@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { hashPassword, generateToken } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { sendWelcomeEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,8 +10,15 @@ export async function POST(req: NextRequest) {
     if (!email || !password || !firstName || !lastName) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
+    if (typeof email !== "string" || !email.includes("@")) {
+      return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
+    }
+    if (typeof password !== "string" || password.length < 8) {
+      return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
+    }
 
-    const existing = await prisma.user.findUnique({ where: { email } });
+    const normalizedEmail = email.trim().toLowerCase();
+    const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (existing) {
       return NextResponse.json({ error: "Email already registered" }, { status: 400 });
     }
@@ -18,7 +26,7 @@ export async function POST(req: NextRequest) {
     const hashed = await hashPassword(password);
     const user = await prisma.user.create({
       data: {
-        email,
+        email: normalizedEmail,
         password: hashed,
         firstName,
         lastName,
@@ -41,6 +49,9 @@ export async function POST(req: NextRequest) {
         totalLoss: 0,
       },
     });
+
+    // Account creation must succeed even if the optional email provider is temporarily unavailable.
+    await sendWelcomeEmail({ email: user.email, firstName: user.firstName });
 
     const token = generateToken(user.id, user.role);
     return NextResponse.json({
