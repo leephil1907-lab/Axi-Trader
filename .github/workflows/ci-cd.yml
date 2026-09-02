@@ -9,6 +9,10 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    env:
+      # Prisma validate parses the schema but does not connect to a database.
+      # Railway's real DATABASE_URL remains an environment variable in production.
+      DATABASE_URL: "postgresql://ci:ci@localhost:5432/axi_trader?schema=public"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
