@@ -3,9 +3,11 @@ import Stripe from "stripe";
 import { verifyToken } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendTransactionEmail } from "@/lib/email";
+import { rateLimit } from "@/lib/rate-limit";
+import { writeAuditLog } from "@/lib/audit";
 
 function auth(req: NextRequest) {
-  const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+  const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || req.cookies.get("axi_token")?.value;
   return token ? verifyToken(token) : null;
 }
 
@@ -13,13 +15,19 @@ export async function POST(req: NextRequest) {
   try {
     const decoded = auth(req);
     if (!decoded) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const { type, amount, currency, method, promoCode } = await req.json();
-    const numericAmount = Number(amount);
-    const normalizedCurrency = String(currency || "").trim().toUpperCase();
-    const normalizedMethod = String(method || "").trim().toLowerCase();
+    const rl = await rateLimit("user-transactions", decoded.userId, 20, 60 * 60_000);
+    if (!rl.allowed) return NextResponse.json({ error: "Too many funding requests. Try again later." }, { status: 429, headers: { "Retry-After": String(Math.max(1, Math.ceil((rl.resetAt.getTime() - Date.now()) / 1000))) } });
+
+    const body = await req.json();
+    const type = body.type;
+    const numericAmount = Number(body.amount);
+    const normalizedCurrency = String(body.currency || "").trim().toUpperCase();
+    const normalizedMethod = String(body.method || "").trim().toLowerCase();
+    const promoCode = typeof body.promoCode === "string" ? body.promoCode.trim().slice(0, 64) : "";
     if (!["deposit", "withdrawal"].includes(type)) return NextResponse.json({ error: "Invalid transaction type" }, { status: 400 });
-    if (!Number.isFinite(numericAmount) || numericAmount <= 0) return NextResponse.json({ error: "Amount must be greater than zero" }, { status: 400 });
-    if (!normalizedCurrency || !normalizedMethod) return NextResponse.json({ error: "Currency and method are required" }, { status: 400 });
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0 || numericAmount > 100000000) return NextResponse.json({ error: "Invalid transaction amount" }, { status: 400 });
+    if (Math.round(numericAmount * 100) !== numericAmount * 100) return NextResponse.json({ error: "Amount may contain at most 2 decimal places" }, { status: 400 });
+    if (!normalizedCurrency || !/^[A-Z]{3}$/.test(normalizedCurrency) || !normalizedMethod || !/^[a-z0-9._-]{2,80}$/.test(normalizedMethod)) return NextResponse.json({ error: "Currency and payment method are invalid" }, { status: 400 });
 
     let paymentDetails: string | undefined;
     let fundingMethod: any = null;
@@ -33,7 +41,7 @@ export async function POST(req: NextRequest) {
 
     let promotionEnrollmentId: string | undefined;
     if (type === "deposit" && promoCode) {
-      const code = String(promoCode).trim().toUpperCase();
+      const code = promoCode.toUpperCase();
       const user = await prisma.user.findUnique({ where: { id: decoded.userId }, select: { country: true, accountType: true, currency: true } });
       const promotion = await prisma.promotion.findUnique({ where: { code } });
       if (!user || !promotion) return NextResponse.json({ error: "Promo code is invalid" }, { status: 404 });
@@ -53,6 +61,7 @@ export async function POST(req: NextRequest) {
     }
 
     const tx = await prisma.transaction.create({ data: { userId: decoded.userId, type, amount: numericAmount, currency: normalizedCurrency, method: normalizedMethod, status: "pending", promotionEnrollmentId, paymentDetails } });
+    await writeAuditLog({ actorUserId: decoded.userId, action: `transaction.${type}.submitted`, resource: "transaction", resourceId: tx.id, ipAddress: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip"), userAgent: req.headers.get("user-agent"), requestId: req.headers.get("x-request-id"), metadata: { amount: numericAmount, currency: normalizedCurrency, method: normalizedMethod } });
     const accountUser = await prisma.user.findUnique({ where: { id: decoded.userId }, select: { email: true, firstName: true } });
     if (accountUser) void sendTransactionEmail(accountUser, type, "pending", numericAmount.toFixed(2), normalizedCurrency);
 
@@ -61,14 +70,15 @@ export async function POST(req: NextRequest) {
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
       const origin = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin;
       try {
-        const session = await stripe.checkout.sessions.create({ mode:"payment", payment_method_types:["card"], line_items:[{price_data:{currency:normalizedCurrency.toLowerCase(),product_data:{name:"AxiTrades account funding"},unit_amount:Math.round(numericAmount*100)},quantity:1}], metadata:{transactionId:tx.id,userId:decoded.userId}, success_url:`${origin}/deposit/?payment=success`, cancel_url:`${origin}/deposit/?payment=cancelled` });
-        await prisma.transaction.update({ where:{id:tx.id}, data:{paymentReference:session.id} });
-        return NextResponse.json({ transaction:{...tx,paymentReference:session.id}, url:session.url }, { status:201 });
+        const session = await stripe.checkout.sessions.create({ mode: "payment", payment_method_types: ["card"], line_items: [{ price_data: { currency: normalizedCurrency.toLowerCase(), product_data: { name: "AxiTrades account funding" }, unit_amount: Math.round(numericAmount * 100) }, quantity: 1 }], metadata: { transactionId: tx.id, userId: decoded.userId }, success_url: `${origin}/deposit/?payment=success`, cancel_url: `${origin}/deposit/?payment=cancelled` });
+        await prisma.transaction.update({ where: { id: tx.id }, data: { paymentReference: session.id } });
+        return NextResponse.json({ transaction: { ...tx, paymentReference: session.id }, url: session.url }, { status: 201 });
       } catch (stripeError) {
-        await prisma.transaction.update({ where:{id:tx.id}, data:{status:"rejected",rejectionReason:"Unable to initialize Stripe checkout"} });
+        await prisma.transaction.update({ where: { id: tx.id }, data: { status: "rejected", rejectionReason: "Unable to initialize Stripe checkout" } });
+        await writeAuditLog({ actorUserId: decoded.userId, action: "transaction.deposit.rejected", resource: "transaction", resourceId: tx.id, outcome: "failure", metadata: { reason: "stripe_checkout_initialization_failed" } });
         if (accountUser) void sendTransactionEmail(accountUser, "deposit", "rejected", numericAmount.toFixed(2), normalizedCurrency, "Unable to initialize the card payment session.");
         console.error("Stripe checkout initialization error", stripeError);
-        return NextResponse.json({ error:"Unable to start card payment" }, { status:502 });
+        return NextResponse.json({ error: "Unable to start card payment" }, { status: 502 });
       }
     }
     return NextResponse.json({ transaction: tx }, { status: 201 });
