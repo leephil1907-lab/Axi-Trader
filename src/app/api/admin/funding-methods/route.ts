@@ -13,7 +13,7 @@ const num = (v: unknown) => v === null || v === undefined || v === "" ? null : N
 
 export async function GET(req: NextRequest) {
   if (!isAdmin(req)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  try { return NextResponse.json({ methods: await prisma.fundingMethod.findMany({ orderBy: { sortOrder: "asc" } }) }); }
+  try { return NextResponse.json({ methods: await prisma.fundingMethod.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }) }); }
   catch (error) { console.error("Admin funding methods error", error); return NextResponse.json({ error: "Failed to load funding methods" }, { status: 500 }); }
 }
 
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     const name = String(b.name || "").trim();
     const type = String(b.type || "").trim().toLowerCase();
     if (!key || !name || !["card", "crypto", "bank", "wallet", "other"].includes(type)) return NextResponse.json({ error: "Key, name and a valid method type are required" }, { status: 400 });
-    const method = await prisma.fundingMethod.create({ data: { key, name, type, enabled: Boolean(b.enabled), countries: text(b.countries), currencies: text(b.currencies), minAmount: num(b.minAmount), maxAmount: num(b.maxAmount), instructions: text(b.instructions), asset: text(b.asset), network: text(b.network), walletAddress: text(b.walletAddress), bankName: text(b.bankName), bankAccountName: text(b.bankAccountName), bankAccount: text(b.bankAccount), bankRouting: text(b.bankRouting), bankSwift: text(b.bankSwift), stripeEnabled: Boolean(b.stripeEnabled), stripePublicKey: text(b.stripePublicKey), sortOrder: Number.isFinite(Number(b.sortOrder)) ? Number(b.sortOrder) : 0 } });
+    const method = await prisma.fundingMethod.create({ data: { key, name, type, enabled: Boolean(b.enabled), countries: text(b.countries), currencies: text(b.currencies), minAmount: num(b.minAmount), maxAmount: num(b.maxAmount), instructions: text(b.instructions), asset: text(b.asset), network: text(b.network), walletAddress: text(b.walletAddress), bankName: text(b.bankName), bankAccountName: text(b.bankAccountName), bankAccount: text(b.bankAccount), bankRouting: text(b.bankRouting), bankSwift: text(b.bankSwift), stripeEnabled: Boolean(b.stripeEnabled), stripePublicKey: text(b.stripePublicKey), logoUrl: text(b.logoUrl), sortOrder: Number.isFinite(Number(b.sortOrder)) ? Number(b.sortOrder) : 0 } });
     return NextResponse.json({ method }, { status: 201 });
   } catch (error: any) { console.error("Admin funding method create error", error); return NextResponse.json({ error: error?.code === "P2002" ? "Method key already exists" : "Failed to create funding method" }, { status: error?.code === "P2002" ? 409 : 500 }); }
 }
@@ -36,7 +36,7 @@ export async function PATCH(req: NextRequest) {
     const b = await req.json();
     if (!b.id) return NextResponse.json({ error: "Method id is required" }, { status: 400 });
     const data: Record<string, unknown> = {};
-    for (const k of ["name", "type", "countries", "currencies", "instructions", "asset", "network", "walletAddress", "bankName", "bankAccountName", "bankAccount", "bankRouting", "bankSwift", "stripePublicKey"]) if (b[k] !== undefined) data[k] = text(b[k]);
+    for (const k of ["name", "type", "countries", "currencies", "instructions", "asset", "network", "walletAddress", "bankName", "bankAccountName", "bankAccount", "bankRouting", "bankSwift", "stripePublicKey", "logoUrl"]) if (b[k] !== undefined) data[k] = text(b[k]);
     for (const k of ["minAmount", "maxAmount", "sortOrder"]) if (b[k] !== undefined) data[k] = k === "sortOrder" ? Number(b[k]) : num(b[k]);
     for (const k of ["enabled", "stripeEnabled"]) if (b[k] !== undefined) data[k] = Boolean(b[k]);
     const method = await prisma.fundingMethod.update({ where: { id: String(b.id) }, data });
