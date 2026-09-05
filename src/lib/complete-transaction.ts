@@ -1,16 +1,15 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { calculateBonus } from "@/lib/promotions";
 import { sendTransactionEmail } from "@/lib/email";
 import { writeAuditLog } from "@/lib/audit";
 
 export async function completeTransaction(id: string, reviewer = "payment_provider") {
-  const result = await prisma.$transaction(async tx => {
+  const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const transaction = await tx.transaction.findUnique({ where: { id }, include: { promotionEnrollment: { include: { promotion: true } }, bonusLedger: true } });
     if (!transaction) throw new Error("TRANSACTION_NOT_FOUND");
     if (transaction.status !== "pending") return transaction;
 
-    // Serialize balance-changing operations for the same account. Without this
-    // row lock, two concurrent withdrawals could both observe the same balance.
     await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${transaction.userId} FOR UPDATE`;
     const user = await tx.user.findUnique({ where: { id: transaction.userId } });
     if (!user || user.status !== "active") throw new Error("USER_NOT_FOUND");
