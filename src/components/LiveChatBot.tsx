@@ -4,68 +4,29 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, X, Send, Bot, User, ChevronDown, Headphones } from "lucide-react";
 import { ChatMessage } from "@/types";
+import Link from "next/link";
 
-const botResponses: Record<string, string[]> = {
-  greeting: [
-    "Hello! Welcome to Axi. How can I assist you today?",
-    "Hi there! I'm your Axi support assistant. What can I help you with?",
-  ],
-  deposit: [
-    "You can deposit funds via Bank Transfer, Credit/Debit Card, Crypto Wallet, or Skrill. All methods are fee-free. Go to your Dashboard and click 'Deposit' to get started.",
-    "We support multiple deposit methods: Bank Transfer (1-3 days), Card (Instant), Crypto (up to 15 mins), and Skrill (Instant). Which would you prefer?",
-  ],
-  withdraw: [
-    "To withdraw, go to Dashboard → Withdraw, select your method, enter the amount, and submit. Withdrawals are processed within 24-48 hours.",
-    "Withdrawals can be made to your Bank Account, Crypto Wallet, or e-wallet. Processing time is 24-48 hours for verified accounts.",
-  ],
-  account: [
-    "To open an account, click 'Open Account' on our homepage, fill in your details, verify your identity, and fund your account. It takes just a few minutes!",
-    "Account opening is simple: Register → Verify ID → Deposit → Trade. You can start with as little as $0 on a Standard account.",
-  ],
-  leverage: [
-    "Axi offers up to 500:1 leverage on forex and indices, 200:1 on crypto, and 20:1 on shares. Leverage varies by instrument and account type.",
-    "Leverage allows you to control larger positions with less capital. We offer up to 500:1 on major forex pairs. Use responsibly!",
-  ],
-  platform: [
-    "We offer MetaTrader 4, MetaTrader 5, and our proprietary Axi Trading Platform. All are available on web, desktop, and mobile.",
-    "You can trade on MT4, MT5, or our Axi platform. MT4 is the industry standard, MT5 has more features, and our platform is designed for modern traders.",
-  ],
-  support: [
-    "Our support team is available 24/5 via live chat, email (support@axi.com), and phone. Average response time is under 2 minutes.",
-    "You can reach us via live chat (fastest), email at support@axi.com, or phone. We're here to help 24/5!",
-  ],
-  default: [
-    "I understand. Could you provide more details so I can better assist you?",
-    "I'm here to help! Could you clarify your question or check our Help Center for more information?",
-    "That's a great question. Let me connect you with a human agent who can provide more detailed assistance.",
-  ],
-};
-
-function getFallbackResponse(userMsg: string): string {
-  // Used only if the live AI call fails (network/API issue) so the widget never goes silent
-  const lower = userMsg.toLowerCase();
-  if (lower.includes("deposit") || lower.includes("fund") || lower.includes("add money")) return botResponses.deposit[Math.floor(Math.random() * botResponses.deposit.length)];
-  if (lower.includes("withdraw") || lower.includes("payout") || lower.includes("take out")) return botResponses.withdraw[Math.floor(Math.random() * botResponses.withdraw.length)];
-  if (lower.includes("account") || lower.includes("register") || lower.includes("sign up") || lower.includes("open")) return botResponses.account[Math.floor(Math.random() * botResponses.account.length)];
-  if (lower.includes("leverage") || lower.includes("margin")) return botResponses.leverage[Math.floor(Math.random() * botResponses.leverage.length)];
-  if (lower.includes("platform") || lower.includes("mt4") || lower.includes("mt5") || lower.includes("app")) return botResponses.platform[Math.floor(Math.random() * botResponses.platform.length)];
-  if (lower.includes("support") || lower.includes("help") || lower.includes("contact") || lower.includes("agent")) return botResponses.support[Math.floor(Math.random() * botResponses.support.length)];
-  return botResponses.default[Math.floor(Math.random() * botResponses.default.length)];
-}
+// The assistant answers ONLY through the live /api/assistant/ service.
+// There are intentionally no canned knowledge replies here: the widget must
+// never invent platform facts (fees, leverage, timings, contacts) offline.
+const ASSISTANT_UNAVAILABLE =
+  "The live assistant is unavailable right now. Please try again shortly or visit the Help Center for platform guidance.";
 
 async function getBotResponse(userMsg: string): Promise<string> {
   try {
-    const res = await fetch("/api/assistant", {
+    const res = await fetch("/api/assistant/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({ message: userMsg }),
     });
-    if (!res.ok) return getFallbackResponse(userMsg);
+    if (!res.ok) return ASSISTANT_UNAVAILABLE;
     const data = await res.json();
-    return data.reply || getFallbackResponse(userMsg);
+    return typeof data.reply === "string" && data.reply.trim()
+      ? data.reply
+      : ASSISTANT_UNAVAILABLE;
   } catch {
-    return getFallbackResponse(userMsg);
+    return ASSISTANT_UNAVAILABLE;
   }
 }
 
@@ -142,9 +103,9 @@ export default function LiveChatBot() {
                 <Bot size={20} className="text-white" />
               </div>
               <div className="flex-1">
-                <h3 className="text-white font-bold text-sm">Axi Live Support</h3>
+                <h3 className="text-white font-bold text-sm">Axi Assistant</h3>
                 <p className="text-white/50 text-xs flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-[#22A958]" /> Online
+                  <span className="w-2 h-2 rounded-full bg-[#F5C842]" /> Automated replies
                 </p>
               </div>
               <button onClick={() => setIsOpen(false)} className="text-white/50 hover:text-white transition-colors">
@@ -218,7 +179,10 @@ export default function LiveChatBot() {
             {/* Footer */}
             <div className="px-4 py-2 bg-[#F5F2ED] text-center shrink-0">
               <p className="text-[10px] text-[#9B9590]">
-                Need human support? <a href="mailto:support@axi.com" className="text-[#D31C2B] font-bold">Email us</a> or call <span className="font-bold">+1-800-AXI-TRADE</span>
+                Need more help?{" "}
+                <Link href="/helpcenter/" className="text-[#D31C2B] font-bold">
+                  Visit the Help Center
+                </Link>
               </p>
             </div>
           </motion.div>

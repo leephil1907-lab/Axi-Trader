@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Groq from "groq-sdk";
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+export const dynamic = "force-dynamic";
 
 // Public endpoint — LiveChatBot renders on both public pages (homepage, markets,
 // helpcenter) and authenticated ones, so this intentionally does not require a
@@ -15,6 +15,11 @@ export async function POST(req: NextRequest) {
     if (message.length > 1000) {
       return NextResponse.json({ error: "Message too long (max 1000 characters)" }, { status: 400 });
     }
+
+    if (!process.env.GROQ_API_KEY) {
+      return NextResponse.json({ reply: "Live chat assistant is not configured yet. Please try Help Center or contact support." });
+    }
+    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
     const completion = await groq.chat.completions.create({
       model: "llama-3.3-70b-versatile",

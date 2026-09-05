@@ -9,15 +9,15 @@ function appUrl(): string {
 }
 
 function layout(title: string, preheader: string, body: string): string {
-  return `<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#f7f5f1;font-family:Arial,Helvetica,sans-serif;color:#171717"><div style="display:none;max-height:0;overflow:hidden">${escapeHtml(preheader)}</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f7f5f1;padding:28px 12px"><tr><td align="center"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;background:#fff;border:1px solid #e8e4de;border-radius:18px;overflow:hidden"><tr><td style="padding:24px 28px;border-bottom:1px solid #eeeae4"><div style="font-size:23px;font-weight:800;letter-spacing:-.5px">Axi<span style="color:#c7192d">Trades</span></div></td></tr><tr><td style="padding:32px 28px"><h1 style="font-size:25px;line-height:1.25;margin:0 0 14px">${escapeHtml(title)}</h1>${body}</td></tr><tr><td style="padding:20px 28px;background:#faf9f7;color:#777;font-size:12px;line-height:1.7">This is an automated account notification from AxiTrades. We will never ask you to disclose your password, authentication codes, or private keys by email. If you did not initiate this activity, contact support immediately.</td></tr></table><div style="max-width:640px;padding:18px 12px;color:#888;font-size:11px;line-height:1.6;text-align:center">© AxiTrades. Please do not reply to this automated message.</div></td></tr></table></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;color:#282424"><div style="display:none;max-height:0;overflow:hidden">${escapeHtml(preheader)}</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:0"><tr><td align="center"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:620px;background:#ffffff;margin:0 auto"><tr><td style="padding:26px 32px;border-bottom:4px solid #e4002e"><div style="font-size:30px;font-weight:900;letter-spacing:-2px;color:#e4002e;line-height:1">axi<span style="color:#282424">trades</span></div></td></tr><tr><td style="padding:36px 32px 8px"><h1 style="font-size:30px;line-height:1.15;margin:0 0 16px;letter-spacing:-.5px;color:#0b0b0c">${escapeHtml(title)}</h1>${body}</td></tr><tr><td style="padding:8px 32px 36px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #ececee;margin-top:12px"><tr><td style="padding:18px 0 0;color:#6d6d6f;font-size:12px;line-height:1.7">This is an automated account notification from AxiTrades. We will never ask you to disclose your password, authentication codes, or private keys by email. If you did not initiate this activity, contact support immediately.</td></tr></table></td></tr><tr><td style="background:#0b0b0c;padding:26px 32px"><div style="font-size:20px;font-weight:900;letter-spacing:-1px;color:#e4002e;line-height:1;margin-bottom:12px">axi</div><p style="margin:0;color:#8a8a8e;font-size:10.5px;line-height:1.7">Trading leveraged products carries a high level of risk and may not be suitable for all investors. You may lose substantially more than your initial investment.</p><p style="margin:14px 0 0;color:#5c5c60;font-size:11px;line-height:1.6">© AxiTrades · www.axitrades.com · Please do not reply to this automated message.</p></td></tr></table></td></tr></table></body></html>`;
 }
 
 function button(label: string, href: string): string {
-  return `<p style="margin:24px 0"><a href="${escapeHtml(href)}" style="display:inline-block;background:#c7192d;color:#fff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:9px">${escapeHtml(label)}</a></p>`;
+  return `<p style="margin:28px 0 8px"><a href="${escapeHtml(href)}" style="display:inline-block;background:#e4002e;color:#ffffff;text-decoration:none;font-weight:800;font-size:13px;letter-spacing:1.5px;text-transform:uppercase;padding:15px 30px;border-radius:6px">${escapeHtml(label)}</a></p>`;
 }
 
 function detailTable(rows: Array<[string, string]>): string {
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8e4de;border-radius:12px;margin:22px 0;overflow:hidden">${rows.map(([label, value]) => `<tr><td style="padding:12px 14px;border-bottom:1px solid #eeeae4;color:#777;font-size:13px">${escapeHtml(label)}</td><td style="padding:12px 14px;border-bottom:1px solid #eeeae4;text-align:right;font-weight:700;font-size:14px">${escapeHtml(value)}</td></tr>`).join("")}</table>`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa;border:1px solid #ececee;border-radius:12px;margin:24px 0;overflow:hidden">${rows.map(([label, value]) => `<tr><td style="padding:13px 16px;border-bottom:1px solid #ececee;color:#6d6d6f;font-size:13px">${escapeHtml(label)}</td><td style="padding:13px 16px;border-bottom:1px solid #ececee;text-align:right;font-weight:800;font-size:14px;color:#0b0b0c">${escapeHtml(value)}</td></tr>`).join("")}</table>`;
 }
 
 export async function sendEmail(options: { to: string; subject: string; html: string }): Promise<boolean> {
@@ -44,7 +44,7 @@ export async function sendEmail(options: { to: string; subject: string; html: st
   }
 }
 
-export async function sendWelcomeEmail(user: { email: string; firstName: string }) {
+export async function sendWelcomeEmail(user: { email: string; firstName: string | null | undefined }) {
   const name = escapeHtml(user.firstName || "there");
   return sendEmail({
     to: user.email,
@@ -53,7 +53,7 @@ export async function sendWelcomeEmail(user: { email: string; firstName: string 
   });
 }
 
-export async function sendTransactionEmail(user: { email: string; firstName: string }, kind: "deposit" | "withdrawal", status: "pending" | "completed" | "rejected", amount: string, currency: string, reason?: string) {
+export async function sendTransactionEmail(user: { email: string; firstName: string | null | undefined }, kind: "deposit" | "withdrawal", status: "pending" | "completed" | "rejected", amount: string, currency: string, reason?: string) {
   const action = kind === "deposit" ? "Deposit" : "Withdrawal";
   const statusLabel = status === "completed" ? "Completed" : status === "rejected" ? "Rejected" : "Received and pending review";
   const message = status === "completed" ? `Your ${action.toLowerCase()} has been completed and the transaction record has been updated.` : status === "rejected" ? `Your ${action.toLowerCase()} was rejected. ${reason || "Please review the transaction in your dashboard or contact support."}` : `We received your ${action.toLowerCase()} request. It remains pending until the required payment or compliance review is completed.`;
@@ -64,7 +64,7 @@ export async function sendTransactionEmail(user: { email: string; firstName: str
   });
 }
 
-export async function sendKycSubmittedEmail(user: { email: string; firstName: string }) {
+export async function sendKycSubmittedEmail(user: { email: string; firstName: string | null | undefined }) {
   return sendEmail({
     to: user.email,
     subject: "Verification documents received — AxiTrades",
@@ -72,12 +72,25 @@ export async function sendKycSubmittedEmail(user: { email: string; firstName: st
   });
 }
 
-export async function sendKycDecisionEmail(user: { email: string; firstName: string }, status: "approved" | "rejected" | "pending", reason?: string) {
+export async function sendKycDecisionEmail(user: { email: string; firstName: string | null | undefined }, status: "approved" | "rejected" | "pending", reason?: string) {
   const title = status === "approved" ? "Verification approved" : status === "rejected" ? "Verification update" : "Verification remains pending";
   const message = status === "approved" ? "Your identity verification has been approved." : status === "rejected" ? `Your identity verification was not approved at this time. ${reason || "Please review the requirements in your account and submit updated documents if requested."}` : "Your verification is still under review.";
   return sendEmail({
     to: user.email,
     subject: `${title} — AxiTrades`,
     html: layout(title, "An update is available for your AxiTrades verification.", `<p style="font-size:16px;line-height:1.7">Hello ${escapeHtml(user.firstName || "there")},</p><p style="font-size:15px;line-height:1.7">${escapeHtml(message)}</p>${button("Open account", `${appUrl()}/dashboard/`)}`),
+  });
+}
+
+export async function sendAdminNotification(title: string, preheader: string, intro: string, rows: Array<[string, string]>, ctaLabel = "Open admin dashboard"): Promise<boolean> {
+  const to = (process.env.ADMIN_NOTIFICATION_EMAIL || "").trim();
+  if (!to) {
+    console.warn("Admin notification skipped: ADMIN_NOTIFICATION_EMAIL is not configured.");
+    return false;
+  }
+  return sendEmail({
+    to,
+    subject: `${title} — AxiTrades admin`,
+    html: layout(title, preheader, `<p style="font-size:15px;line-height:1.7">${escapeHtml(intro)}</p>${detailTable(rows)}${button(ctaLabel, `${appUrl()}/admin/`)}`),
   });
 }

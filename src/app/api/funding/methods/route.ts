@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
       const currencies = split(m.currencies);
       const global = countries.includes("*") || countries.includes("ALL");
       return (global || !countries.length || countries.includes(country)) && (!currencies.length || currencies.includes("*") || currencies.includes("ALL") || currencies.includes(currency));
-    }).map((m: FundingMethodRecord) => ({ id: m.id, key: m.key, name: m.name, type: m.type, minAmount: m.minAmount, maxAmount: m.maxAmount, instructions: m.instructions, asset: m.asset, network: m.network, walletAddress: m.walletAddress, bankName: m.bankName, bankAccountName: m.bankAccountName, bankAccount: m.bankAccount, bankRouting: m.bankRouting, bankSwift: m.bankSwift, stripeEnabled: m.stripeEnabled, stripePublicKey: m.stripePublicKey, logoUrl: m.logoUrl }));
+    }).map((m: FundingMethodRecord) => ({ id: m.id, key: m.key, name: m.name, type: m.type, minAmount: m.minAmount, maxAmount: m.maxAmount, instructions: m.instructions, asset: m.asset, network: m.network, walletAddress: m.walletAddress, bankName: m.bankName, bankAccountName: m.bankAccountName, bankAccount: m.bankAccount, bankRouting: m.bankRouting, bankSwift: m.bankSwift, payeeName: m.payeeName, payeeAccount: m.payeeAccount, stripeEnabled: m.stripeEnabled, stripePublicKey: m.stripePublicKey, logoUrl: m.logoUrl }));
     return NextResponse.json({ country, currency, methods: available });
   } catch (error) {
     console.error("Funding methods error", error);

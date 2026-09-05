@@ -10,14 +10,26 @@ export type AuditContext = {
   ipAddress?: string | null;
   userAgent?: string | null;
   requestId?: string | null;
-  metadata?: Prisma.InputJsonValue;
+  // Local sqlite preview stores JSON as string; production Postgres uses Json.
+  metadata?: unknown;
 };
 
 type AuditClient = typeof prisma | Prisma.TransactionClient;
 
 /** Audit writes are server-side only and may also be committed inside a DB transaction. */
 export async function writeAuditLog(context: AuditContext, db: AuditClient = prisma) {
-  return db.auditLog.create({
+  // Production Postgres uses a native Json column (pass the value through);
+  // local SQLite preview stores it stringified (no Json type there).
+  const isPostgres = (process.env.DATABASE_URL || "").startsWith("postgres");
+  const metadata =
+    context.metadata == null
+      ? null
+      : isPostgres
+        ? (context.metadata as Prisma.InputJsonValue)
+        : typeof context.metadata === "string"
+          ? context.metadata
+          : JSON.stringify(context.metadata);
+  return (db as any).auditLog.create({
     data: {
       actorUserId: context.actorUserId ?? null,
       action: context.action,
@@ -27,7 +39,7 @@ export async function writeAuditLog(context: AuditContext, db: AuditClient = pri
       ipAddress: context.ipAddress ?? null,
       userAgent: context.userAgent ?? null,
       requestId: context.requestId ?? null,
-      metadata: context.metadata,
+      metadata,
     },
   });
 }

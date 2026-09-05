@@ -1,0 +1,12 @@
+{
+  "tasks": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "deploy": {
+    "framework": "nextjs",
+    "install": "npm install",
+    "build": "npx prisma generate && npx prisma db push && npm run build"
+  }
+}

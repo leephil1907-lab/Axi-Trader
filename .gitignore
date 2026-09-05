@@ -40,3 +40,8 @@ prisma/migrations/
 
 # Docker
 dev.db
+
+# local-only artifacts
+.env
+*.db
+email-preview-*.html

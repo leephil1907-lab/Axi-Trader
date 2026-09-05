@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { verifyToken } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { sendTransactionEmail } from "@/lib/email";
+import { sendTransactionEmail, sendAdminNotification } from "@/lib/email";
 import { rateLimit } from "@/lib/rate-limit";
 import { writeAuditLog } from "@/lib/audit";
 
@@ -31,12 +31,20 @@ export async function POST(req: NextRequest) {
 
     let paymentDetails: string | undefined;
     let fundingMethod: any = null;
+    // Both deposits and withdrawals must reference a real, enabled funding
+    // method. Arbitrary method strings are never accepted.
+    fundingMethod = await prisma.fundingMethod.findFirst({ where: { key: normalizedMethod, enabled: true } });
+    if (!fundingMethod) return NextResponse.json({ error: "This funding method is currently unavailable" }, { status: 409 });
     if (type === "deposit") {
-      fundingMethod = await prisma.fundingMethod.findFirst({ where: { key: normalizedMethod, enabled: true } });
-      if (!fundingMethod) return NextResponse.json({ error: "This funding method is currently unavailable" }, { status: 409 });
       if (fundingMethod.minAmount !== null && numericAmount < fundingMethod.minAmount) return NextResponse.json({ error: `Minimum amount is ${fundingMethod.minAmount} ${normalizedCurrency}` }, { status: 400 });
       if (fundingMethod.maxAmount !== null && numericAmount > fundingMethod.maxAmount) return NextResponse.json({ error: `Maximum amount is ${fundingMethod.maxAmount} ${normalizedCurrency}` }, { status: 400 });
-      paymentDetails = JSON.stringify({ fundingMethodId: fundingMethod.id, name: fundingMethod.name, type: fundingMethod.type, asset: fundingMethod.asset, network: fundingMethod.network, walletAddress: fundingMethod.walletAddress, bankName: fundingMethod.bankName, bankAccountName: fundingMethod.bankAccountName, bankAccount: fundingMethod.bankAccount, bankRouting: fundingMethod.bankRouting, bankSwift: fundingMethod.bankSwift, instructions: fundingMethod.instructions });
+      paymentDetails = JSON.stringify({ fundingMethodId: fundingMethod.id, name: fundingMethod.name, type: fundingMethod.type, asset: fundingMethod.asset, network: fundingMethod.network, walletAddress: fundingMethod.walletAddress, bankName: fundingMethod.bankName, bankAccountName: fundingMethod.bankAccountName, bankAccount: fundingMethod.bankAccount, bankRouting: fundingMethod.bankRouting, bankSwift: fundingMethod.bankSwift, payeeName: fundingMethod.payeeName, payeeAccount: fundingMethod.payeeAccount, instructions: fundingMethod.instructions });
+    } else {
+      // Withdrawals stay pending until admin review. The destination supplied
+      // by the user is recorded verbatim (capped) for the reviewer.
+      const destination = typeof body.details === "string" ? body.details.trim().slice(0, 500) : "";
+      if (!destination) return NextResponse.json({ error: "Destination details are required" }, { status: 400 });
+      paymentDetails = JSON.stringify({ fundingMethodId: fundingMethod.id, name: fundingMethod.name, type: fundingMethod.type, destination });
     }
 
     let promotionEnrollmentId: string | undefined;
@@ -62,8 +70,23 @@ export async function POST(req: NextRequest) {
 
     const tx = await prisma.transaction.create({ data: { userId: decoded.userId, type, amount: numericAmount, currency: normalizedCurrency, method: normalizedMethod, status: "pending", promotionEnrollmentId, paymentDetails } });
     await writeAuditLog({ actorUserId: decoded.userId, action: `transaction.${type}.submitted`, resource: "transaction", resourceId: tx.id, ipAddress: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip"), userAgent: req.headers.get("user-agent"), requestId: req.headers.get("x-request-id"), metadata: { amount: numericAmount, currency: normalizedCurrency, method: normalizedMethod } });
-    const accountUser = await prisma.user.findUnique({ where: { id: decoded.userId }, select: { email: true, firstName: true } });
+    const accountUser = await prisma.user.findUnique({ where: { id: decoded.userId }, select: { email: true, firstName: true, name: true } });
     if (accountUser) void sendTransactionEmail(accountUser, type, "pending", numericAmount.toFixed(2), normalizedCurrency);
+    // Every funding/withdrawal request lands in the admin's inbox with the
+    // user's details so nothing waits silently for review.
+    void sendAdminNotification(
+      type === "deposit" ? `New funding request — ${numericAmount.toFixed(2)} ${normalizedCurrency}` : `New withdrawal request — ${numericAmount.toFixed(2)} ${normalizedCurrency}`,
+      type === "deposit" ? "A customer submitted a funding request." : "A customer requested a withdrawal.",
+      type === "deposit"
+        ? "A customer says they have paid (or is about to pay) through the method below. Verify the money arrived, then approve the transaction in the admin dashboard to credit their balance."
+        : "A customer requested a payout. Verify and process it, then approve the transaction in the admin dashboard.",
+      [
+        ["User", `${accountUser?.name || accountUser?.firstName || "—"} (${accountUser?.email || decoded.userId})`],
+        ["Amount", `${numericAmount.toFixed(2)} ${normalizedCurrency}`],
+        ["Method", `${fundingMethod.name} (${normalizedMethod})`],
+        ["Transaction ID", tx.id],
+      ]
+    );
 
     if (type === "deposit" && fundingMethod?.type === "card" && fundingMethod.stripeEnabled) {
       if (!process.env.STRIPE_SECRET_KEY) return NextResponse.json({ error: "Stripe is not configured" }, { status: 503 });

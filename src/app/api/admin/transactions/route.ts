@@ -41,7 +41,7 @@ export async function PATCH(req: NextRequest) {
     const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const transaction = await tx.transaction.findUnique({ where: { id } });
       if (!transaction) throw new Error("TRANSACTION_NOT_FOUND");
-      if (transaction.status !== "pending") throw new Error("TRANSACTION_ALREADY_REVIEWED");
+      if (transaction.status !== "pending" && transaction.status !== "paid") throw new Error("TRANSACTION_ALREADY_REVIEWED");
       const updated = await tx.transaction.update({ where: { id }, data: { status, rejectionReason: status === "rejected" ? rejectionReason || "Rejected by admin" : null, reviewedAt: new Date(), reviewedBy: admin.id } });
       await writeAuditLog({ actorUserId: admin.id, action: `transaction.${status}`, resource: "transaction", resourceId: id, ...ctx, metadata: { previousStatus: transaction.status, newStatus: status } }, tx);
       return updated;

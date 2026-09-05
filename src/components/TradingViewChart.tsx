@@ -13,6 +13,21 @@ function toTradingViewSymbol(value: string) {
   if (/^(XAU|XAG)USD$/.test(forex)) return `OANDA:${forex}`;
   if (/^BTCUSD$/.test(forex)) return "COINBASE:BTCUSD";
   if (/^ETHUSD$/.test(forex)) return "COINBASE:ETHUSD";
+  if (/^SOLUSD$/.test(forex)) return "COINBASE:SOLUSD";
+  const indices: Record<string, string> = {
+    US500: "SP:SPX",
+    US30: "DJ:DJI",
+    NAS100: "NASDAQ:NDX",
+    GER40: "XETR:DAX",
+    UK100: "TVC:UKX",
+    JPN225: "TVC:NI225",
+  };
+  if (indices[forex]) return indices[forex];
+  const futures: Record<string, string> = {
+    USOIL: "TVC:USOIL",
+    UKOIL: "TVC:UKOIL",
+  };
+  if (futures[forex]) return futures[forex];
   return normalized;
 }
 

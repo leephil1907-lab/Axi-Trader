@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const protectedRoutes = [
-  "/dashboard", "/trading", "/deposit", "/withdraw", "/wallet", "/settings", "/copy-trading",
+  "/dashboard", "/trading", "/deposit", "/withdraw", "/wallet", "/settings",
+  "/verify", "/accounts", "/positions", "/watchlist",
 ];
 const adminRoutes = ["/admin"];
 
@@ -19,8 +20,8 @@ async function verifyToken(token: string): Promise<{ userId: string; role: strin
     if (parts.length !== 3) return null;
     const secret = process.env.JWT_SECRET;
     if (!secret || secret.length < 32) return null;
-    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
-    const valid = await crypto.subtle.verify("HMAC", key, base64UrlDecode(parts[2]), new TextEncoder().encode(`${parts[0]}.${parts[1]}`));
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret) as unknown as BufferSource, { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+    const valid = await crypto.subtle.verify("HMAC", key, base64UrlDecode(parts[2]) as unknown as BufferSource, new TextEncoder().encode(`${parts[0]}.${parts[1]}`) as unknown as BufferSource);
     if (!valid) return null;
     const payload = JSON.parse(new TextDecoder().decode(base64UrlDecode(parts[1]))) as { userId?: string; role?: string; exp?: number };
     if (!payload.userId || !payload.role || !payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
@@ -71,6 +72,9 @@ export async function middleware(request: NextRequest) {
   }
 
   const response = NextResponse.next();
+  // The admin console is unlinked from the public site; also tell every
+  // crawler that lands on it directly to keep out.
+  if (isAdmin) response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
   if (isApi) {
     if (origin) {
       response.headers.set("Access-Control-Allow-Origin", origin);

@@ -11,9 +11,6 @@ const securityHeaders = [
 const nextConfig = {
   images: { unoptimized: true },
   trailingSlash: true,
-  // Required for Deno Deploy / containerized production (standalone server).
-  output: "standalone",
-  eslint: { ignoreDuringBuilds: true },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },

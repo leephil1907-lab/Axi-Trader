@@ -8,9 +8,16 @@ export async function completeTransaction(id: string, reviewer = "payment_provid
   const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const transaction = await tx.transaction.findUnique({ where: { id }, include: { promotionEnrollment: { include: { promotion: true } }, bonusLedger: true } });
     if (!transaction) throw new Error("TRANSACTION_NOT_FOUND");
-    if (transaction.status !== "pending") return transaction;
+    // Creditable states: "pending" (manual request not yet reviewed) and
+    // "paid" (Stripe confirmed the money; still needs admin approval).
+    // Anything else (completed/rejected) is returned untouched (idempotent).
+    if (transaction.status !== "pending" && transaction.status !== "paid") return transaction;
 
-    await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${transaction.userId} FOR UPDATE`;
+    // Row-level lock on PostgreSQL production. SQLite (local preview) does not
+    // support FOR UPDATE; its transactions serialize writes instead.
+    if ((process.env.DATABASE_URL || "").startsWith("postgres")) {
+      await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${transaction.userId} FOR UPDATE`;
+    }
     const user = await tx.user.findUnique({ where: { id: transaction.userId } });
     if (!user || user.status !== "active") throw new Error("USER_NOT_FOUND");
 

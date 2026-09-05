@@ -8,6 +8,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://www.axitrades.com"),
   title: "Axi - Online Trading Broker | Forex, Crypto, CFDs",
   description: "Trade Forex, Crypto, Commodities & Indices with competitive spreads, fast execution, and professional trading tools.",
   keywords: ["forex trading", "crypto trading", "CFD trading", "MT4", "MT5", "online trading", "financial markets", "AXI"],
@@ -46,7 +47,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
-      <body className={`${inter.className} antialiased`}>
+      <body className="font-axi-body antialiased">
         {children}
       </body>
     </html>

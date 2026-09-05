@@ -7,8 +7,8 @@ Disallow: /dashboard
 Disallow: /trading
 Disallow: /settings
 
-Sitemap: https://axi-trading.com/sitemap.xml
-Sitemap: https://axi-trading.com/sitemap-markets.xml
-Sitemap: https://axi-trading.com/sitemap-blog.xml
+Sitemap: https://www.axitrades.com/sitemap.xml
+Sitemap: https://www.axitrades.com/sitemap-markets.xml
+Sitemap: https://www.axitrades.com/sitemap-blog.xml
 
 Crawl-delay: 1

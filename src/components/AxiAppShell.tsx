@@ -25,15 +25,14 @@ export function AxiAppShell({ children, active = "Dashboard" }: { children: Reac
           <AxiWordmark />
           <nav className="hidden flex-1 items-center gap-1 xl:flex">
             {primary.map(({ label, href, icon: Icon }) => (
-              <Link key={label} href={href} className={`flex items-center gap-2 rounded-md px-3.5 py-2.5 text-xs font-bold transition ${active === label ? "bg-[#f6f4f0] text-[#d61f2c]" : "text-[#66696a] hover:bg-[#f6f4f0] hover:text-[#17191a]"}`}>
+              <Link key={label} href={href} className={`flex items-center gap-2 rounded-md px-3.5 py-2.5 text-xs font-bold transition ${active === label ? "bg-[#f6f4f0] text-[#e4002e]" : "text-[#66696a] hover:bg-[#f6f4f0] hover:text-[#17191a]"}`}>
                 <Icon className="h-4 w-4" />{label}
               </Link>
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-2">
-            <Link href="/deposit/" className="hidden rounded-md bg-[#d61f2c] px-4 py-2.5 text-[10px] font-extrabold uppercase tracking-wider text-white xl:inline-flex">Add funds</Link>
+            <Link href="/deposit/" className="hidden rounded-md bg-[#e4002e] px-4 py-2.5 text-[10px] font-extrabold uppercase tracking-wider text-white xl:inline-flex">Add funds</Link>
             <Link href="/helpcenter/" aria-label="Help" className="hidden rounded-full p-2.5 text-[#6c6f70] hover:bg-[#f6f4f0] sm:block"><CircleHelp className="h-5 w-5" /></Link>
-            <button type="button" aria-label="Notifications" className="rounded-full p-2.5 text-[#6c6f70] hover:bg-[#f6f4f0]"><Bell className="h-5 w-5" /></button>
             <details className="relative">
               <summary className="flex cursor-pointer list-none items-center gap-2 rounded-full border border-[#dedbd5] px-2 py-1.5 text-xs font-bold hover:bg-[#f6f4f0]"><span className="grid h-7 w-7 place-items-center rounded-full bg-[#17191a] text-white">A</span><ChevronDown className="h-3.5 w-3.5 text-[#6c6f70]" /></summary>
               <div className="absolute right-0 top-12 w-60 rounded-lg border border-[#dedbd5] bg-white p-2 shadow-xl">
@@ -41,7 +40,7 @@ export function AxiAppShell({ children, active = "Dashboard" }: { children: Reac
                 <Link href="/deposit/" className="flex items-center gap-3 rounded-md px-3 py-2.5 text-xs font-semibold hover:bg-[#f6f4f0]"><WalletCards className="h-4 w-4" />Funding & history</Link>
                 <Link href="/settings/" className="flex items-center gap-3 rounded-md px-3 py-2.5 text-xs font-semibold hover:bg-[#f6f4f0]"><Settings className="h-4 w-4" />Settings</Link>
                 <Link href="/helpcenter/" className="flex items-center gap-3 rounded-md px-3 py-2.5 text-xs font-semibold hover:bg-[#f6f4f0]"><CircleHelp className="h-4 w-4" />Customer Support</Link>
-                <Link href="/login/" className="flex items-center gap-3 rounded-md px-3 py-2.5 text-xs font-semibold text-[#d61f2c] hover:bg-[#fff5f5]"><LogOut className="h-4 w-4" />Logout</Link>
+                <Link href="/login/" className="flex items-center gap-3 rounded-md px-3 py-2.5 text-xs font-semibold text-[#e4002e] hover:bg-[#fff5f5]"><LogOut className="h-4 w-4" />Logout</Link>
               </div>
             </details>
             <Link href="/accounts/" className="rounded-md p-2.5 text-[#17191a] xl:hidden" aria-label="Open account navigation"><Menu className="h-5 w-5" /></Link>
@@ -51,7 +50,7 @@ export function AxiAppShell({ children, active = "Dashboard" }: { children: Reac
       <main>{children}</main>
       <nav aria-label="Primary mobile navigation" className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-4 border-t border-[#dedbd5] bg-white/98 px-2 py-2 backdrop-blur lg:hidden">
         {primary.map(({ label, href, icon: Icon }) => (
-          <Link key={label} href={href} className={`flex flex-col items-center gap-1 rounded-md py-2 text-[9px] font-extrabold uppercase tracking-wide ${active === label ? "text-[#d61f2c]" : "text-[#777a7b]"}`}><Icon className="h-4 w-4" />{label}</Link>
+          <Link key={label} href={href} className={`flex flex-col items-center gap-1 rounded-md py-2 text-[9px] font-extrabold uppercase tracking-wide ${active === label ? "text-[#e4002e]" : "text-[#777a7b]"}`}><Icon className="h-4 w-4" />{label}</Link>
         ))}
       </nav>
       <div className="border-t border-[#dedbd5] bg-white px-4 py-5 text-center text-[10px] text-[#858888]">Trading involves risk. Review the applicable terms and risk disclosures before trading.</div>
