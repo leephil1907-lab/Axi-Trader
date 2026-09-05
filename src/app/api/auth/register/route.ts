@@ -17,10 +17,10 @@ export async function POST(req: NextRequest) {
     const password = typeof body.password === "string" ? body.password : "";
     const firstName = typeof body.firstName === "string" ? body.firstName.trim().slice(0, 100) : "";
     const lastName = typeof body.lastName === "string" ? body.lastName.trim().slice(0, 100) : "";
-    const country = typeof body.country === "string" ? body.country.trim().slice(0, 100) : "United States";
+    const country = typeof body.country === "string" ? body.country.trim().slice(0, 100) : "";
     const phone = typeof body.phone === "string" ? body.phone.trim().slice(0, 40) : "";
 
-    if (!email || !password || !firstName || !lastName) return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    if (!email || !password || !firstName || !lastName || !country) return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
     if (password.length < 8 || password.length > 128) return NextResponse.json({ error: "Password must be 8-128 characters" }, { status: 400 });
 
