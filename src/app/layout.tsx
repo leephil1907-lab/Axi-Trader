@@ -9,7 +9,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Axi - Online Trading Broker | Forex, Crypto, CFDs",
-  description: "Trade Forex, Crypto, Commodities & Indices with tight spreads, fast execution, and award-winning platforms. Start with a free demo account.",
+  description: "Trade Forex, Crypto, Commodities & Indices with competitive spreads, fast execution, and professional trading tools.",
   keywords: ["forex trading", "crypto trading", "CFD trading", "MT4", "MT5", "online trading", "financial markets", "AXI"],
   authors: [{ name: "AXI Trading" }],
   robots: "index, follow",
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     type: "website",
     siteName: "AXI Trading",
     title: "Axi - Online Trading Broker",
-    description: "Trade Forex, Crypto, Commodities & Indices with tight spreads and fast execution.",
+    description: "Trade Forex, Crypto, Commodities & Indices with competitive spreads and fast execution.",
     images: [{
       url: "/og-image.jpg",
       width: 1200,
