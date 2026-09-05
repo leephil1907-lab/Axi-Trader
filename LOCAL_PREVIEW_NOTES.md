@@ -12,7 +12,7 @@ The site is built and running:
 
 Open the **Axi Trader Website** live preview to browse: Home, Markets, Trading, Copy Trading, Login/Register, Dashboard (after login), Deposit/Withdraw/Wallet, Admin.
 
-Database is **fully empty** (0 rows in every table) — all demo/test accounts, audit and rate-limit residue were wiped on 2026-09-05. Register a fresh account from `/register/` to try the app.
+Database holds only the owner admin account (`admin@axitrades.com`, role `admin`) — all demo/test users, transactions and audit residue were wiped on 2026-09-05 — all demo/test accounts, audit and rate-limit residue were wiped on 2026-09-05. Register a fresh account from `/register/` to try the app.
 
 ## What was changed to run locally
 Production repo targets **PostgreSQL + Railway/Vercel**. The sandbox has no Postgres, so for local preview only:

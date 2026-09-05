@@ -178,6 +178,8 @@ model FundingMethod {
   bankAccount     String?
   bankRouting     String?
   bankSwift       String?
+  payeeName       String?
+  payeeAccount    String?
   stripeEnabled   Boolean  @default(false)
   stripePublicKey String?
   logoUrl         String?

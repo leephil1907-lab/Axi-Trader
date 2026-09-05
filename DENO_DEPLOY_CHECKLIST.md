@@ -34,7 +34,7 @@ This repo is already prepared: `output: "standalone"` in `next.config.js` and a
   ```bash
   npm install
   npx prisma generate
-  npm run build   # expect: "Compiled successfully", 43 routes incl. /verify
+  npm run build   # expect: "Compiled successfully", 44 routes incl. /verify, /copy-trading, /admin
   ```
 - [ ] **Commit & push to GitHub** (`main` branch). Confirm `.env` is NOT
   committed (`.gitignore` already excludes `.env`, `*.db`, `.next/`).
