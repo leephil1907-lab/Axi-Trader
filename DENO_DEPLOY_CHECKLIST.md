@@ -83,6 +83,9 @@ This repo is already prepared: `output: "standalone"` in `next.config.js` and a
 | `BROKER_EXECUTION_URL` (+ key/secret), `KYC_PROVIDER` (+ keys) | **leave empty** until real integrations exist — trading/copy-trading stay honestly disabled |
 
 - [ ] **Deploy.** Watch the build logs: Prisma generate → db push → Next build → live URL.
+  - Build fails in step 2/3 (`db push`)? The log now says exactly why — 99% of
+    the time `DATABASE_URL` is missing or unreachable (see the env table above),
+    then press **Retry Build**. No code change is needed for a retry.
 
 ## D. First-run production setup (on the live URL)
 

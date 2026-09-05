@@ -7,6 +7,6 @@
   "deploy": {
     "framework": "nextjs",
     "install": "npm install",
-    "build": "npx prisma generate && npx prisma db push && npm run build"
+    "build": "node scripts/deno-build.mjs"
   }
 }
