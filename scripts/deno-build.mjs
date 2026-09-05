@@ -31,6 +31,18 @@ if (!/^postgres(ql)?:\/\//.test(url)) {
   );
   process.exit(1);
 }
+const direct = (process.env.DIRECT_URL || "").trim();
+if (!direct) {
+  console.error(
+    "\nBUILD FAILED: DIRECT_URL is not set.\n" +
+      "Set it in dash.deno.com -> your project -> Settings -> Environment Variables,\n" +
+      "using the DIRECT (non-pooled, port 5432) Postgres connection string from\n" +
+      "Supabase -> Project Settings -> Database -> Connection string (URI, pooling OFF).\n" +
+      "DATABASE_URL stays the pooled one (port 6543) for the running app; DIRECT_URL\n" +
+      "is used only to create the tables during the build. Then press Retry Build.\n"
+  );
+  process.exit(1);
+}
 try {
   run("npx prisma db push", "pushing schema to Postgres");
 } catch {
