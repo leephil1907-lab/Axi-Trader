@@ -18,6 +18,23 @@ export async function POST(req: NextRequest) {
   const decoded = auth(req);
   if (!decoded) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const user = await prisma.user.findUnique({
+    where: { id: decoded.userId },
+    select: { kycStatus: true },
+  });
+
+  if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+  // Live trading is unavailable until compliance has explicitly verified identity.
+  // Never infer, pre-approve, or simulate verification.
+  if (user.kycStatus !== "verified") {
+    return NextResponse.json({
+      error: "Identity verification is required before live trading",
+      code: "KYC_REQUIRED",
+      kycStatus: user.kycStatus,
+    }, { status: 403 });
+  }
+
   // Never manufacture fills. Until a real broker execution adapter is configured,
   // the platform must not claim that an order was executed.
   if (!process.env.BROKER_EXECUTION_URL) {
