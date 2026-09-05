@@ -71,7 +71,8 @@ This repo is already prepared: `output: "standalone"` in `next.config.js` and a
 
 | Variable | Value |
 |---|---|
-| `DATABASE_URL` | pooled Postgres URL from step B |
+| `DATABASE_URL` | **pooled** Postgres URL from step B (Supabase: URI with pooling ON, port 6543) |
+| `DIRECT_URL` | **direct** Postgres URL (Supabase: URI with pooling OFF, port 5432) — build-time table creation only |
 | `JWT_SECRET` | 32+ char secret |
 | `JWT_EXPIRES_IN` | `7d` |
 | `NEXT_PUBLIC_APP_URL` | `https://<your-app>.deno.dev` (must match exactly — middleware CORS compares origins) |
