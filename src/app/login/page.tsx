@@ -93,6 +93,7 @@ export default function LoginPage() {
                   <label htmlFor="password" className="mb-2 block text-xs font-bold">Password</label>
                   <div className="relative"><LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7b7e7f]" /><input id="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" className="h-12 w-full rounded-[4px] border border-[#cfd0ce] bg-white pl-11 pr-11 text-sm outline-none transition focus:border-[#e4002e] focus:ring-2 focus:ring-[#e4002e]/10" /><button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#777a7b]">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>
                 </div>
+                <div className="flex justify-end"><Link href="/forgot-password/" className="text-xs font-bold text-[#e4002e] hover:underline">Forgot password?</Link></div>
 
                 <button type="submit" disabled={loading} className="flex h-12 w-full items-center justify-center gap-2 rounded-[4px] bg-[#e4002e] px-5 text-xs font-extrabold uppercase tracking-[0.12em] text-white transition hover:bg-[#b20024] disabled:cursor-not-allowed disabled:opacity-60">{loading ? "Signing in" : "Sign in"}{!loading && <ArrowRight className="h-4 w-4" />}</button>
               </form>

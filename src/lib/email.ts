@@ -94,3 +94,11 @@ export async function sendAdminNotification(title: string, preheader: string, in
     html: layout(title, preheader, `<p style="font-size:15px;line-height:1.7">${escapeHtml(intro)}</p>${detailTable(rows)}${button(ctaLabel, `${appUrl()}/admin/`)}`),
   });
 }
+
+export async function sendPasswordResetEmail(user: { email: string; firstName: string | null | undefined }, code: string) {
+  return sendEmail({
+    to: user.email,
+    subject: "Your password reset code — AxiTrades",
+    html: layout("Reset your password", "Use this code to choose a new AxiTrades password. It expires in 15 minutes.", `<p style="font-size:16px;line-height:1.7">Hello ${escapeHtml(user.firstName || "there")},</p><p style="font-size:15px;line-height:1.7">Enter this code on the password reset page to choose a new password. It expires in <strong>15 minutes</strong> and can only be used once.</p><p style="margin:26px 0;text-align:center"><span style="display:inline-block;font-size:34px;font-weight:900;letter-spacing:10px;color:#0b0b0c;background:#fafafa;border:1px solid #ececee;border-radius:12px;padding:14px 20px 14px 30px">${escapeHtml(code)}</span></p><p style="font-size:13px;line-height:1.7;color:#666">If you did not request this, ignore this email — your password stays unchanged.</p>${button("Reset password", `${appUrl()}/reset-password/?email=${encodeURIComponent(user.email)}`)}`),
+  });
+}

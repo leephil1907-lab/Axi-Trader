@@ -40,6 +40,20 @@ model User {
   promotions   PromotionEnrollment[]
   bonusLedger  BonusLedger[]
   auditLogs    AuditLog[]
+  passwordResets PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  attempts  Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 model Transaction {
