@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "postbuild": "node -e \"const fs=require('fs');for(const [a,b] of [['public','.next/standalone/public'],['.next/static','.next/standalone/.next/static']]){try{fs.rmSync(b,{recursive:true,force:true});fs.cpSync(a,b,{recursive:true});}catch(e){console.warn('postbuild sync skipped for '+a+': '+e.message)}}console.log('standalone assets synced')\"",
+    "postbuild": "node scripts/postbuild-sync.mjs",
     "start": "next start",
     "lint": "next lint",
     "test": "node --test tests/**/*.test.mjs",
